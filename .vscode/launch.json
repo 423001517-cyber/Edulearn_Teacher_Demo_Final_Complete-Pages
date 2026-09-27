@@ -1,0 +1,29 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Teacher website",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "apps/teacher_web",
+      "program": "lib/main.dart",
+      "deviceId": "chrome",
+      "args": ["--web-port", "5050"]
+    },
+    {
+      "name": "Admin website",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "apps/admin_web",
+      "program": "lib/main.dart",
+      "deviceId": "chrome",
+      "args": ["--web-port", "5100"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Both websites",
+      "configurations": ["Teacher website", "Admin website"]
+    }
+  ]
+}

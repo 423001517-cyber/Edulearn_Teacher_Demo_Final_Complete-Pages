@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!--
+    $FLUTTER_BASE_HREF is replaced by `flutter build web --base-href`.
+    Keep it as "/" when the site is served from the root of its domain.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="EduLearn admin website — classes and codes, teachers, rosters and school reports.">
+  <meta name="theme-color" content="#1D5538">
+
+  <!-- iOS / Android home-screen -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="EduLearn Admin">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="manifest" href="manifest.json">
+  <title>EduLearn Admin</title>
+
+  <style>
+    /* Shown for a moment while Flutter loads. */
+    body { margin: 0; background: #FBF7EE; }
+    #splash { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+    #splash img { width: 84px; height: 84px; animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 50% { transform: scale(0.92); opacity: 0.7; } }
+  </style>
+</head>
+<body>
+  <div id="splash"><img src="icons/Icon-192.png" alt="EduLearn Admin"></div>
+  <script>
+    // Remove the splash as soon as Flutter draws its first frame.
+    window.addEventListener('flutter-first-frame', function () {
+      var s = document.getElementById('splash');
+      if (s) s.remove();
+    });
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

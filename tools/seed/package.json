@@ -1,0 +1,13 @@
+{
+  "name": "edulearn-seed",
+  "private": true,
+  "type": "module",
+  "description": "Demo data for the EduLearn teacher dashboard",
+  "scripts": {
+    "seed": "node seed.mjs --reset",
+    "seed:dry": "node seed.mjs --dry-run"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0"
+  }
+}

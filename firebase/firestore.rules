@@ -1,0 +1,216 @@
+rules_version = '2';
+
+// EduLearn — teacher website + admin website (student app rules come later).
+// Teachers only ever see documents stamped with their own uid (teacherId).
+// Admins (Auth custom claim role == 'admin', set only by Cloud Functions)
+// can read school-wide and manage class assignments, rosters and settings.
+// Class codes, accounts and request decisions go through callable
+// functions, never direct writes.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isAdmin() { return signedIn() && request.auth.token.role == 'admin'; }
+    function uid() { return request.auth.uid; }
+    function isMine(data) { return signedIn() && data.teacherId == uid(); }
+    function ownsClass(classId) {
+      return classId is string &&
+        get(/databases/$(database)/documents/classes/$(classId)).data.teacherId == uid();
+    }
+    function ownsStudent(studentId) {
+      return studentId is string &&
+        get(/databases/$(database)/documents/students/$(studentId)).data.teacherId == uid();
+    }
+    function onlyChanges(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    // ---------------------------------------------------------------- teachers
+    match /teachers/{teacherId} {
+      allow read: if (signedIn() && uid() == teacherId) || isAdmin();
+      allow create: if signedIn() && uid() == teacherId
+        && request.resource.data.role == 'teacher';
+      allow update: if signedIn() && uid() == teacherId
+        && onlyChanges(['displayName', 'photoUrl', 'fcmTokens', 'updatedAt']);
+
+      match /notifications/{id} {
+        allow read, delete: if signedIn() && uid() == teacherId;
+        allow update: if signedIn() && uid() == teacherId && onlyChanges(['read']);
+      }
+    }
+
+    // ------------------------------------------------------------------ admins
+    match /admins/{uid} {
+      allow read: if isAdmin();
+      allow write: if false; // setAdminRole function
+    }
+
+    match /settings/{doc} {
+      allow read: if signedIn();
+      allow write: if isAdmin()
+        && request.resource.data.schoolName is string
+        && request.resource.data.schoolName.size() > 0
+        && request.resource.data.schoolName.size() <= 120;
+    }
+
+    // One doc per official code keeps codes unique (createClass function).
+    match /classCodes/{code} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ----------------------------------------------------------------- classes
+    // Created only by the createClass / approveClassRequest functions.
+    match /classes/{classId} {
+      allow read: if isMine(resource.data) || isAdmin();
+      allow create, delete: if false;
+      // Admin: reassign teacher, rename, archive. (Code: regenerateClassCode.)
+      allow update: if isAdmin()
+        && onlyChanges(['teacherId', 'section', 'subject', 'gradeLevel', 'status', 'archivedAt'])
+        && exists(/databases/$(database)/documents/teachers/$(request.resource.data.teacherId))
+        && request.resource.data.gradeLevel is int
+        && request.resource.data.gradeLevel >= 1 && request.resource.data.gradeLevel <= 12
+        && request.resource.data.section is string
+        && request.resource.data.section.size() > 0
+        && request.resource.data.section.size() <= 60
+        && request.resource.data.status in ['active', 'archived'];
+      // Teacher: archive / restore / settings only.
+      allow update: if isMine(resource.data)
+        && onlyChanges(['status', 'archivedAt', 'subject', 'coverImageUrl'])
+        && request.resource.data.status in ['active', 'archived']
+        && request.resource.data.subject is string
+        && request.resource.data.subject.size() > 0
+        && request.resource.data.subject.size() <= 80;
+
+      match /dailyPerformance/{day} {
+        allow read: if ownsClass(classId) || isAdmin();
+        allow write: if false;
+      }
+      match /monthlyStats/{month} {
+        allow read: if ownsClass(classId) || isAdmin();
+        allow write: if false;
+      }
+    }
+
+    // ---------------------------------------------------------------- students
+    // Rosters are managed by admins; the student's teacherId must match the
+    // class's teacher so the student shows up on that teacher's dashboard.
+    match /students/{studentId} {
+      function validStudent(d) {
+        return d.name is string && d.name.size() > 0 && d.name.size() <= 100
+          && d.studentNumber is string && d.studentNumber.size() <= 20
+          && d.gradeLevel is int
+          && d.classId is string
+          && get(/databases/$(database)/documents/classes/$(d.classId)).data.teacherId == d.teacherId;
+      }
+      allow read: if isMine(resource.data) || isAdmin();
+      allow create, update: if isAdmin() && validStudent(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // --------------------------------------------------------------- classwork
+    match /classwork/{id} {
+      allow read: if isAdmin();
+      function validClasswork(d) {
+        return d.teacherId == uid()
+          && ownsClass(d.classId)
+          && d.type in ['lesson', 'quest', 'quiz', 'boss', 'activity']
+          && d.status in ['draft', 'scheduled', 'published', 'closed']
+          && d.title is string && d.title.size() > 0 && d.title.size() <= 200
+          && d.dueDate is timestamp
+          && d.points is int && d.points >= 0 && d.points <= 1000;
+      }
+      allow read: if isMine(resource.data);
+      allow create: if signedIn() && validClasswork(request.resource.data)
+        && !('submittedCount' in request.resource.data)
+        && !('scoreSum' in request.resource.data)
+        && !('scoredCount' in request.resource.data);
+      // Counters belong to Cloud Functions.
+      allow update: if isMine(resource.data) && validClasswork(request.resource.data)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['teacherId', 'submittedCount', 'scoreSum', 'scoredCount']);
+      allow delete: if isMine(resource.data);
+    }
+
+    // ------------------------------------------------------------- submissions
+    // Created by the student app; teachers grade and return them.
+    match /submissions/{id} {
+      allow read: if isMine(resource.data) || isAdmin();
+      allow create, delete: if false;
+      allow update: if isMine(resource.data)
+        && onlyChanges(['score', 'privateFeedback', 'status', 'returnedAt'])
+        && request.resource.data.status in ['pending', 'returned']
+        && (request.resource.data.score == null
+            || (request.resource.data.score is int
+                && request.resource.data.score >= 0
+                && request.resource.data.score <= resource.data.maxScore))
+        && request.resource.data.privateFeedback is string
+        && request.resource.data.privateFeedback.size() <= 2000;
+    }
+
+    // ----------------------------------------------------------- announcements
+    match /announcements/{id} {
+      allow read: if isAdmin();
+      function validAnnouncement(d) {
+        return d.teacherId == uid()
+          && (d.classId == null || ownsClass(d.classId))
+          && d.title is string && d.title.size() > 0 && d.title.size() <= 200
+          && d.body is string && d.body.size() <= 5000
+          && d.pinned is bool;
+      }
+      allow read: if isMine(resource.data);
+      allow create: if signedIn() && validAnnouncement(request.resource.data);
+      allow update: if isMine(resource.data) && validAnnouncement(request.resource.data);
+      allow delete: if isMine(resource.data);
+    }
+
+    // --------------------------------------------- function-owned read models
+    match /activity/{id} {
+      allow read: if isMine(resource.data) || isAdmin();
+      allow write: if false;
+    }
+    match /missingWork/{id} {
+      allow read: if isMine(resource.data) || isAdmin();
+      allow write: if false;
+    }
+
+    // -------------------------------------------------------------- attendance
+    match /attendance/{id} {
+      allow read: if isMine(resource.data) || isAdmin();
+      allow create, update: if signedIn()
+        && request.resource.data.teacherId == uid()
+        && ownsClass(request.resource.data.classId)
+        && request.resource.data.date is timestamp
+        && request.resource.data.marks is map;
+      allow delete: if false;
+    }
+
+    // --------------------------------------------------------------- reminders
+    // Queued by the teacher, delivered by the deliverReminder function.
+    match /reminders/{id} {
+      allow read: if isMine(resource.data);
+      allow create: if signedIn()
+        && request.resource.data.teacherId == uid()
+        && ownsStudent(request.resource.data.studentId)
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 1000
+        && request.resource.data.status == 'queued';
+      allow update, delete: if false;
+    }
+
+    // ----------------------------------------------------------- classRequests
+    // Approve / decline happen in functions (they also notify the teacher).
+    match /classRequests/{id} {
+      allow read: if isMine(resource.data) || isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.teacherId == uid()
+        && request.resource.data.status == 'pending'
+        && request.resource.data.gradeLevel is int
+        && request.resource.data.section is string
+        && request.resource.data.section.size() > 0
+        && request.resource.data.section.size() <= 60;
+      allow update, delete: if false;
+    }
+  }
+}

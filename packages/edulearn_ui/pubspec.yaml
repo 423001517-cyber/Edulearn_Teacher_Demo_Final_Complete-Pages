@@ -1,0 +1,24 @@
+name: edulearn_ui
+description: Shared EduLearn theme and widgets for every EduLearn app.
+publish_to: none
+version: 1.0.0
+
+environment:
+  sdk: ^3.8.0
+  flutter: ">=3.32.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  edulearn_core:
+    path: ../edulearn_core
+  fl_chart: ^1.1.1
+  flutter_riverpod: ^2.6.1
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0

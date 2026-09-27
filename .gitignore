@@ -1,0 +1,19 @@
+# Flutter / Dart (any app or package)
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+
+# Firebase
+firebase/functions/node_modules/
+firebase/functions/lib/
+tools/seed/node_modules/
+.firebase/
+*-debug.log
+*-service-account*.json
+
+# Local Firebase emulator data (demo)
+.emulator-data/
+*-debug.log

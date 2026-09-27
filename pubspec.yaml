@@ -1,0 +1,15 @@
+# EduLearn workspace (Dart pub workspaces, Dart 3.6+ / Flutter 3.27+).
+# Run `flutter pub get` once here to set up every app and package.
+name: edulearn_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+workspace:
+  - apps/teacher_web
+  - apps/admin_web
+  - packages/edulearn_core
+  - packages/edulearn_ui
+  # Coming next:
+  # - apps/student_app

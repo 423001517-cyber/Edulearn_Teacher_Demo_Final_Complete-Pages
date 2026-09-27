@@ -1,0 +1,30 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isOwner(uid) { return request.auth != null && request.auth.uid == uid; }
+
+    // Lesson manuscripts / learning materials (25 MB, matches StorageRepository.maxBytes).
+    match /lessons/{uid}/{file} {
+      allow read: if request.auth != null;
+      allow write: if isOwner(uid) && request.resource.size < 25 * 1024 * 1024;
+    }
+
+    // Class cover images (Class Settings).
+    match /class-covers/{uid}/{file} {
+      allow read: if request.auth != null;
+      allow write: if isOwner(uid)
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Generated PDF / CSV reports. Only the teacher can list or write them;
+    // the download URL (with its token) is what gets shared.
+    match /reports/{uid}/{file} {
+      allow read: if isOwner(uid);
+      allow write: if isOwner(uid)
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType in ['application/pdf', 'text/csv'];
+    }
+  }
+}

@@ -1,0 +1,3 @@
+# Same lint rules as the rest of the workspace (see the root file).
+# Keeping this file here also stops `flutter create .` from adding its own.
+include: ../../analysis_options.yaml

@@ -1,0 +1,14 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - firebase/**
+    - tools/**
+    - "**/build/**"
+
+linter:
+  rules:
+    # Style-only; keep `flutter analyze` focused on real problems.
+    prefer_const_constructors: false
+    prefer_const_literals_to_create_immutables: false
+    avoid_print: true

@@ -21,6 +21,15 @@ service cloud.firestore {
       return studentId is string &&
         get(/databases/$(database)/documents/students/$(studentId)).data.teacherId == uid();
     }
+    // A teacher's class comment (students' comments come from the student app).
+    function validTeacherComment(d) {
+      return d.authorId == uid()
+        && d.authorRole == 'teacher'
+        && d.authorName is string && d.authorName.size() <= 120
+        && d.body is string && d.body.size() <= 2000
+        && (d.body.size() > 0 || d.get('attachment', null) != null)
+        && d.createdAt == request.time;
+    }
     function onlyChanges(keys) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
     }
@@ -74,17 +83,48 @@ service cloud.firestore {
         && request.resource.data.section.size() > 0
         && request.resource.data.section.size() <= 60
         && request.resource.data.status in ['active', 'archived'];
-      // Teacher: archive / restore / settings only.
+      // Teacher: archive / restore, Edit class details and Class settings.
+      // (Grade, section and the class code are official — admin only.)
       allow update: if isMine(resource.data)
-        && onlyChanges(['status', 'archivedAt', 'subject', 'coverImageUrl'])
-        && request.resource.data.status in ['active', 'archived']
-        && request.resource.data.subject is string
-        && request.resource.data.subject.size() > 0
-        && request.resource.data.subject.size() <= 80;
+        && onlyChanges(['status', 'archivedAt', 'subject', 'coverImageUrl', 'room', 'description',
+                        'streamPermission', 'classworkNotifications', 'totalPoints', 'showOverallGrade'])
+        && validTeacherClassEdit(request.resource.data);
+
+      function validTeacherClassEdit(d) {
+        return d.status in ['active', 'archived']
+          && d.subject is string && d.subject.size() > 0 && d.subject.size() <= 80
+          && d.get('room', '') is string && d.get('room', '').size() <= 60
+          && d.get('description', '') is string && d.get('description', '').size() <= 1000
+          && d.get('streamPermission', 'postAndComment') in ['postAndComment', 'commentOnly', 'teachersOnly']
+          && d.get('classworkNotifications', 'condensed') in ['details', 'condensed', 'hidden']
+          && d.get('totalPoints', 20) is int
+          && d.get('totalPoints', 20) >= 1 && d.get('totalPoints', 20) <= 1000
+          && d.get('showOverallGrade', true) is bool;
+      }
 
       match /dailyPerformance/{day} {
         allow read: if ownsClass(classId) || isAdmin();
         allow write: if false;
+      }
+      // Gradebook settings, grading scale, hidden columns, private notes.
+      match /gradebook/{docId} {
+        allow read: if ownsClass(classId) || isAdmin();
+        allow write: if ownsClass(classId)
+          && request.resource.data.calculation in ['totalPoints', 'weighted', 'none']
+          && request.resource.data.passingGrade is int
+          && request.resource.data.passingGrade >= 0 && request.resource.data.passingGrade <= 100
+          && request.resource.data.scale is list && request.resource.data.scale.size() <= 12
+          && request.resource.data.notes is map && request.resource.data.notes.size() <= 200;
+      }
+
+      // Classwork topics ("Week 1: Mga Rehiyon"), managed by the class's teacher.
+      match /topics/{topicId} {
+        allow read: if ownsClass(classId) || isAdmin();
+        allow create, update: if ownsClass(classId)
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 80
+          && request.resource.data.position is number;
+        allow delete: if ownsClass(classId);
       }
       match /monthlyStats/{month} {
         allow read: if ownsClass(classId) || isAdmin();
@@ -114,7 +154,7 @@ service cloud.firestore {
       function validClasswork(d) {
         return d.teacherId == uid()
           && ownsClass(d.classId)
-          && d.type in ['lesson', 'quest', 'quiz', 'boss', 'activity']
+          && d.type in ['lesson', 'quest', 'quiz', 'boss', 'activity', 'material']
           && d.status in ['draft', 'scheduled', 'published', 'closed']
           && d.title is string && d.title.size() > 0 && d.title.size() <= 200
           && d.dueDate is timestamp
@@ -124,21 +164,56 @@ service cloud.firestore {
       allow create: if signedIn() && validClasswork(request.resource.data)
         && !('submittedCount' in request.resource.data)
         && !('scoreSum' in request.resource.data)
-        && !('scoredCount' in request.resource.data);
+        && !('scoredCount' in request.resource.data)
+        && !('commentCount' in request.resource.data);
       // Counters belong to Cloud Functions.
       allow update: if isMine(resource.data) && validClasswork(request.resource.data)
         && !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['teacherId', 'submittedCount', 'scoreSum', 'scoredCount']);
+            .hasAny(['teacherId', 'submittedCount', 'scoreSum', 'scoredCount', 'commentCount']);
       allow delete: if isMine(resource.data);
+
+      // Quiz / Friday Boss questions WITH the answer key — teacher only.
+      // getAfter() so the item and its questions can be saved in one batch.
+      match /private/{docId} {
+        allow read: if isMine(get(/databases/$(database)/documents/classwork/$(id)).data) || isAdmin();
+        allow create, update: if isMine(getAfter(/databases/$(database)/documents/classwork/$(id)).data)
+          && request.resource.data.questions is list
+          && request.resource.data.questions.size() <= 200;
+        allow delete: if isMine(get(/databases/$(database)/documents/classwork/$(id)).data);
+      }
+
+      // Class comments on classwork (Stream → comments panel).
+      match /comments/{commentId} {
+        function post() { return get(/databases/$(database)/documents/classwork/$(id)).data; }
+        allow read: if isMine(post()) || isAdmin();
+        allow create: if signedIn() && isMine(post()) && validTeacherComment(request.resource.data);
+        allow delete: if isMine(post());
+        allow update: if false;
+      }
     }
 
     // ------------------------------------------------------------- submissions
     // Created by the student app; teachers grade and return them.
     match /submissions/{id} {
       allow read: if isMine(resource.data) || isAdmin();
-      allow create, delete: if false;
+      // Gradebook: a grade for work handed in on paper (or not at all).
+      allow create: if signedIn()
+        && request.resource.data.teacherId == uid()
+        && request.resource.data.source == 'teacher'
+        && ownsClass(request.resource.data.classId)
+        && ownsStudent(request.resource.data.studentId)
+        && request.resource.data.status in ['pending', 'returned']
+        && request.resource.data.maxScore is int
+        && (request.resource.data.score == null
+            || (request.resource.data.score is int
+                && request.resource.data.score >= 0
+                && request.resource.data.score <= request.resource.data.maxScore))
+        && request.resource.data.privateFeedback is string
+        && request.resource.data.privateFeedback.size() <= 2000;
+      // "Remove submission": the student hands it in again.
+      allow delete: if isMine(resource.data);
       allow update: if isMine(resource.data)
-        && onlyChanges(['score', 'privateFeedback', 'status', 'returnedAt'])
+        && onlyChanges(['score', 'privateFeedback', 'status', 'returnedAt', 'rubricScores', 'notifyStudent'])
         && request.resource.data.status in ['pending', 'returned']
         && (request.resource.data.score == null
             || (request.resource.data.score is int
@@ -149,19 +224,54 @@ service cloud.firestore {
     }
 
     // ----------------------------------------------------------- announcements
+    // Calendar → Add event ("Faculty Meeting", field trips, reminders).
+    match /calendarEvents/{id} {
+      function validEvent(d) {
+        return d.teacherId == uid()
+          && (d.classId == null || ownsClass(d.classId))
+          && d.title is string && d.title.size() > 0 && d.title.size() <= 120
+          && d.start is timestamp
+          && (d.end == null || d.end is timestamp)
+          && d.allDay is bool
+          && d.kind in ['school', 'classEvent', 'reminder']
+          && d.get('location', '') is string && d.get('location', '').size() <= 120
+          && d.get('notes', '') is string && d.get('notes', '').size() <= 1000;
+      }
+      allow read: if isMine(resource.data) || isAdmin();
+      allow create: if signedIn() && validEvent(request.resource.data);
+      allow update: if isMine(resource.data) && validEvent(request.resource.data);
+      allow delete: if isMine(resource.data);
+    }
+
+    // Stream posts. status: published | scheduled (publishAt) | draft.
+    // commentCount belongs to Cloud Functions.
     match /announcements/{id} {
       allow read: if isAdmin();
       function validAnnouncement(d) {
         return d.teacherId == uid()
           && (d.classId == null || ownsClass(d.classId))
-          && d.title is string && d.title.size() > 0 && d.title.size() <= 200
-          && d.body is string && d.body.size() <= 5000
-          && d.pinned is bool;
+          && d.title is string && d.title.size() <= 200
+          && d.body is string && d.body.size() <= 8000
+          && d.pinned is bool
+          && d.get('status', 'published') in ['published', 'scheduled', 'draft']
+          && (d.get('status', 'published') != 'scheduled' || d.get('publishAt', null) is timestamp)
+          && d.get('attachments', []) is list && d.get('attachments', []).size() <= 10
+          && (d.title.size() > 0 || d.body.size() > 0 || d.get('attachments', []).size() > 0);
       }
       allow read: if isMine(resource.data);
-      allow create: if signedIn() && validAnnouncement(request.resource.data);
-      allow update: if isMine(resource.data) && validAnnouncement(request.resource.data);
+      allow create: if signedIn() && validAnnouncement(request.resource.data)
+        && !('commentCount' in request.resource.data);
+      allow update: if isMine(resource.data) && validAnnouncement(request.resource.data)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['teacherId', 'commentCount']);
       allow delete: if isMine(resource.data);
+
+      match /comments/{commentId} {
+        function post() { return get(/databases/$(database)/documents/announcements/$(id)).data; }
+        allow read: if isMine(post()) || isAdmin();
+        allow create: if signedIn() && isMine(post()) && validTeacherComment(request.resource.data);
+        allow delete: if isMine(post());
+        allow update: if false;
+      }
     }
 
     // --------------------------------------------- function-owned read models

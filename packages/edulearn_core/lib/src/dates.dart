@@ -23,6 +23,10 @@ String longDate(DateTime d) => DateFormat('EEE, MMM d, y').format(d);
 String shortDate(DateTime d) => DateFormat('EEE, MMM d').format(d);
 String fullDate(DateTime d) => DateFormat('MMM d, y').format(d);
 
+/// School quarter 1–4 for a date. Philippine school years start in June:
+/// Q1 Jun–Aug, Q2 Sep–Nov, Q3 Dec–Feb, Q4 Mar–May.
+int schoolQuarter(DateTime d) => ((d.month - 6 + 12) % 12) ~/ 3 + 1;
+
 String greetingFor(DateTime now) => switch (now.hour) {
       < 12 => 'Good morning',
       < 18 => 'Good afternoon',

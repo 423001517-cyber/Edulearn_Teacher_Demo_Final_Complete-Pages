@@ -9,6 +9,10 @@
  *   publishScheduledClasswork hourly: scheduled → published on its date
  *   nightlyRollup            9 PM: progress, missing work, charts, report stats
  *
+ * Class stream:
+ *   publishScheduledPosts    every 5 min: scheduled posts go live
+ *   onAnnouncementComment · onClassworkComment   comment counts + teacher notices
+ *
  * Admin website (callable, caller must have the `admin` custom claim):
  *   createClass · approveClassRequest · declineClassRequest · regenerateClassCode
  *   createTeacherAccount · teacherPasswordLink · setTeacherStatus · setAdminRole
@@ -28,3 +32,4 @@ export {
   teacherPasswordLink,
 } from './admin/callables';
 export { onClassReassigned } from './admin/propagate';
+export { onAnnouncementComment, onClassworkComment, publishScheduledPosts } from './stream/triggers';

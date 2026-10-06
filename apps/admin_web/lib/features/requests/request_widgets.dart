@@ -225,20 +225,54 @@ class _ApproveDialogState extends ConsumerState<_ApproveDialog> {
 /// Decline with an optional reason (sent to the teacher as a notification).
 Future<void> showDeclineDialog(BuildContext context, ClassRequest r, String teacherName) async {
   final container = ProviderScope.containerOf(context, listen: false);
-  final reason = TextEditingController();
-  final ok = await showDialog<bool>(
+  final note = await showDialog<String>(
     context: context,
-    builder: (ctx) => AppDialog(
+    builder: (_) => _DeclineDialog(request: r, teacherName: teacherName),
+  );
+  if (note == null) return;
+  await attempt(
+    () => container.read(adminFunctionsProvider).declineClassRequest(r.id, note),
+    success: 'Request declined — $teacherName has been notified',
+  );
+}
+
+/// Returns the reason (possibly empty) or null when cancelled. Owns its text
+/// field so it's disposed only after the closing animation.
+class _DeclineDialog extends StatefulWidget {
+  const _DeclineDialog({required this.request, required this.teacherName});
+
+  final ClassRequest request;
+  final String teacherName;
+
+  @override
+  State<_DeclineDialog> createState() => _DeclineDialogState();
+}
+
+class _DeclineDialogState extends State<_DeclineDialog> {
+  final _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppDialog(
       maxWidth: 460,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PanelHeader(title: 'Decline ${r.className}?', subtitle: 'Requested by $teacherName'),
+          PanelHeader(
+            title: 'Decline ${widget.request.className}?',
+            subtitle: 'Requested by ${widget.teacherName}',
+          ),
           const SizedBox(height: 14),
           const FieldLabel('Reason (sent to the teacher)'),
           TextField(
-            controller: reason,
+            controller: _reason,
             minLines: 2,
             maxLines: 4,
             decoration: const InputDecoration(hintText: 'e.g. This section was merged with Rizal.'),
@@ -246,12 +280,14 @@ Future<void> showDeclineDialog(BuildContext context, ClassRequest r, String teac
           const SizedBox(height: 18),
           Row(
             children: [
-              Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel'))),
+              Expanded(
+                child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton(
                   style: FilledButton.styleFrom(backgroundColor: AppColors.red),
-                  onPressed: () => Navigator.pop(ctx, true),
+                  onPressed: () => Navigator.pop(context, _reason.text),
                   child: const Text('Decline request'),
                 ),
               ),
@@ -259,13 +295,6 @@ Future<void> showDeclineDialog(BuildContext context, ClassRequest r, String teac
           ),
         ],
       ),
-    ),
-  );
-  final note = reason.text;
-  reason.dispose();
-  if (ok != true) return;
-  await attempt(
-    () => container.read(adminFunctionsProvider).declineClassRequest(r.id, note),
-    success: 'Request declined — $teacherName has been notified',
-  );
+    );
+  }
 }

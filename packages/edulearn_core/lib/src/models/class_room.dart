@@ -8,9 +8,36 @@ enum ClassStatus {
       v == ClassStatus.archived.name ? ClassStatus.archived : ClassStatus.active;
 }
 
-/// `classes/{classId}` — created by an administrator (class codes are
-/// official). Counters and averages are kept current by Cloud Functions;
-/// teachers may only change `status`, `subject` and `coverImageUrl`.
+/// Who may post and comment in the class stream (Class settings).
+enum StreamPermission {
+  postAndComment('Students can post and comment'),
+  commentOnly('Students can only comment'),
+  teachersOnly('Only teachers can post or comment');
+
+  const StreamPermission(this.label);
+  final String label;
+
+  static StreamPermission parse(Object? v) => StreamPermission.values
+      .firstWhere((p) => p.name == v, orElse: () => StreamPermission.postAndComment);
+}
+
+/// How new classwork appears in the stream (Class settings).
+enum ClassworkNotices {
+  details('Show attachments and details'),
+  condensed('Show condensed notifications'),
+  hidden('Hide notifications');
+
+  const ClassworkNotices(this.label);
+  final String label;
+
+  static ClassworkNotices parse(Object? v) => ClassworkNotices.values
+      .firstWhere((n) => n.name == v, orElse: () => ClassworkNotices.condensed);
+}
+
+/// `classes/{classId}` — created by an administrator (grade, section and
+/// class code are official). Counters and averages are kept current by
+/// Cloud Functions. Teachers may change the status, subject, cover, room,
+/// description and the Class settings preferences.
 class ClassRoom {
   const ClassRoom({
     required this.id,
@@ -27,6 +54,12 @@ class ClassRoom {
     this.coverImageUrl,
     this.colorIndex = 0,
     this.archivedAt,
+    this.room = '',
+    this.description = '',
+    this.streamPermission = StreamPermission.postAndComment,
+    this.classworkNotices = ClassworkNotices.condensed,
+    this.totalPoints = 20,
+    this.showOverallGrade = true,
   });
 
   final String id;
@@ -54,6 +87,18 @@ class ClassRoom {
   final int colorIndex;
   final DateTime? archivedAt;
 
+  // ---- Edit class details / Class settings
+  final String room;
+  final String description;
+  final StreamPermission streamPermission;
+  final ClassworkNotices classworkNotices;
+
+  /// Default points for new graded classwork in this class.
+  final int totalPoints;
+
+  /// Students see their overall grade in the Gradebook (student app).
+  final bool showOverallGrade;
+
   factory ClassRoom.fromDoc(Doc doc) {
     final d = dataOf(doc);
     return ClassRoom(
@@ -71,6 +116,12 @@ class ClassRoom {
       coverImageUrl: readStringOrNull(d['coverImageUrl']),
       colorIndex: readInt(d['colorIndex']),
       archivedAt: readDate(d['archivedAt']),
+      room: readString(d['room']),
+      description: readString(d['description']),
+      streamPermission: StreamPermission.parse(d['streamPermission']),
+      classworkNotices: ClassworkNotices.parse(d['classworkNotifications']),
+      totalPoints: d['totalPoints'] is num ? (d['totalPoints'] as num).toInt() : 20,
+      showOverallGrade: d['showOverallGrade'] != false,
     );
   }
 

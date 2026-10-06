@@ -13,15 +13,17 @@ import 'quick_view_panel.dart';
 
 /// The "Class Actions" popover: Open Class, Quick View, Copy Class Code,
 /// View Students, View Reports, Archive Class.
-enum ClassAction { open, quickView, copyCode, viewStudents, viewReports, settings, archive, restore }
+enum ClassAction { open, quickView, stream, copyCode, viewStudents, viewReports, settings, editDetails, archive, restore }
 
 List<PopupMenuEntry<ClassAction>> classActionItems(ClassRoom c, {bool includeOpen = true}) => [
       if (includeOpen) menuItem(ClassAction.open, Icons.open_in_new_rounded, 'Open Class'),
       if (includeOpen) menuItem(ClassAction.quickView, Icons.visibility_outlined, 'Quick View'),
+      menuItem(ClassAction.stream, Icons.dynamic_feed_outlined, 'Open Stream'),
       menuItem(ClassAction.copyCode, Icons.content_copy_outlined, 'Copy Class Code'),
       menuItem(ClassAction.viewStudents, Icons.groups_outlined, 'View Students'),
       menuItem(ClassAction.viewReports, Icons.bar_chart_rounded, 'View Reports'),
-      menuItem(ClassAction.settings, Icons.tune_rounded, 'Class Settings'),
+      menuItem(ClassAction.settings, Icons.settings_outlined, 'Class Settings'),
+      menuItem(ClassAction.editDetails, Icons.edit_outlined, 'Edit Class Details'),
       const PopupMenuDivider(),
       if (c.isArchived)
         menuItem(ClassAction.restore, Icons.unarchive_outlined, 'Restore Class')
@@ -41,8 +43,12 @@ Future<void> runClassAction(BuildContext context, WidgetRef ref, ClassRoom c, Cl
       goTo(Routes.students(classId: c.id));
     case ClassAction.viewReports:
       goTo(Routes.reports(classId: c.id));
+    case ClassAction.stream:
+      goTo(Routes.stream(classId: c.id));
     case ClassAction.settings:
-      showClassSettings(context, c);
+      goTo(Routes.classSettings(c.id));
+    case ClassAction.editDetails:
+      showEditClassDetails(context, c);
     case ClassAction.archive:
       final repo = ref.read(classesRepositoryProvider);
       final selected = ref.read(selectedClassIdProvider.notifier);

@@ -10,7 +10,7 @@ import '../../../core/navigation.dart';
 import '../../../providers/core_providers.dart';
 
 /// "Archive Grade 4 – Rizal?" — the red button stays disabled until the
-/// teacher ticks "I understand this class can be restored later."
+/// teacher ticks "I understand that this class will be archived".
 Future<bool> showArchiveClassDialog(BuildContext context, ClassRoom c) async {
   final ok = await showDialog<bool>(context: context, builder: (_) => _ArchiveDialog(classRoom: c));
   return ok ?? false;
@@ -47,15 +47,15 @@ class _ArchiveDialogState extends State<_ArchiveDialog> {
             width: 64,
             height: 64,
             decoration: const BoxDecoration(color: AppColors.redSoft, shape: BoxShape.circle),
-            child: const Icon(Icons.error_rounded, color: AppColors.red, size: 36),
+            child: const Icon(Icons.inventory_2_rounded, color: AppColors.red, size: 32),
           ),
           const SizedBox(height: 16),
           Text('Archive ${widget.classRoom.name}?',
               textAlign: TextAlign.center, style: AppText.dialogTitle),
           const SizedBox(height: 10),
           Text(
-            'Students and teachers will no longer see this class under Active Classes. '
-            'Existing lessons, submissions, grades, and reports will be preserved.',
+            'The class will be removed from active classes. Students and teachers can still '
+            'view archived classwork. You can restore it later.',
             textAlign: TextAlign.center,
             style: AppText.meta.copyWith(fontSize: 14, height: 1.5),
           ),
@@ -71,7 +71,7 @@ class _ArchiveDialogState extends State<_ArchiveDialog> {
                   onChanged: (v) => setState(() => _understood = v ?? false),
                 ),
                 const Flexible(
-                  child: Text('I understand this class can be restored later.',
+                  child: Text('I understand that this class will be archived',
                       style: TextStyle(fontSize: 13.5)),
                 ),
               ],
@@ -95,33 +95,39 @@ class _ArchiveDialogState extends State<_ArchiveDialog> {
                     disabledForegroundColor: Colors.white,
                   ),
                   onPressed: _understood ? () => Navigator.pop(context, true) : null,
-                  child: const Text('Archive Class'),
+                  child: const Text('Archive class'),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          Text('This does not permanently delete the class.',
+              style: AppText.meta.copyWith(fontSize: 12.5)),
         ],
       ),
     );
   }
 }
 
-/// Subject and cover image. Grade, section and class code are official and
-/// can only be changed by the administrator.
-Future<void> showClassSettings(BuildContext context, ClassRoom c) =>
-    showDialog<void>(context: context, builder: (_) => _ClassSettingsDialog(classRoom: c));
+/// "Edit class details": cover, subject, room and description. Class name
+/// and section are official and only the administrator changes them.
+Future<void> showEditClassDetails(BuildContext context, ClassRoom c) =>
+    showDialog<void>(context: context, builder: (_) => _EditClassDetailsDialog(classRoom: c));
 
-class _ClassSettingsDialog extends ConsumerStatefulWidget {
-  const _ClassSettingsDialog({required this.classRoom});
+class _EditClassDetailsDialog extends ConsumerStatefulWidget {
+  const _EditClassDetailsDialog({required this.classRoom});
 
   final ClassRoom classRoom;
 
   @override
-  ConsumerState<_ClassSettingsDialog> createState() => _ClassSettingsDialogState();
+  ConsumerState<_EditClassDetailsDialog> createState() => _EditClassDetailsDialogState();
 }
 
-class _ClassSettingsDialogState extends ConsumerState<_ClassSettingsDialog> {
+class _EditClassDetailsDialogState extends ConsumerState<_EditClassDetailsDialog> {
+  final _formKey = GlobalKey<FormState>();
   late final _subject = TextEditingController(text: widget.classRoom.subject);
+  late final _room = TextEditingController(text: widget.classRoom.room);
+  late final _description = TextEditingController(text: widget.classRoom.description);
   Uint8List? _cover;
   String? _coverName;
   bool _saving = false;
@@ -129,6 +135,8 @@ class _ClassSettingsDialogState extends ConsumerState<_ClassSettingsDialog> {
   @override
   void dispose() {
     _subject.dispose();
+    _room.dispose();
+    _description.dispose();
     super.dispose();
   }
 
@@ -147,90 +155,161 @@ class _ClassSettingsDialogState extends ConsumerState<_ClassSettingsDialog> {
   }
 
   Future<void> _save() async {
-    if (_subject.text.trim().isEmpty) return;
+    if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
-      await ref.read(classesRepositoryProvider).updateClassSettings(
+      await ref.read(classesRepositoryProvider).updateClassDetails(
             widget.classRoom.id,
             subject: _subject.text,
+            room: _room.text,
+            description: _description.text,
             coverBytes: _cover,
             coverFileName: _coverName,
           );
       if (!mounted) return;
       Navigator.pop(context);
-      showToast('Class settings saved');
+      showToast('Class details saved');
     } catch (e) {
       setState(() => _saving = false);
       showToast("Couldn't save: $e");
     }
   }
 
+  Widget _readOnly(String label, String value) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FieldLabel(label),
+          Tooltip(
+            message: 'Set by your administrator',
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                filled: true,
+                fillColor: AppColors.chip,
+                suffixIcon: Icon(Icons.lock_outline_rounded, size: 18),
+              ),
+              child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          ),
+        ],
+      );
+
+  Widget _pair(Widget a, Widget b) => LayoutBuilder(builder: (context, c) {
+        if (c.maxWidth < 420) return Column(children: [a, const SizedBox(height: 14), b]);
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [Expanded(child: a), const SizedBox(width: 14), Expanded(child: b)],
+        );
+      });
+
   @override
   Widget build(BuildContext context) {
     final c = widget.classRoom;
     return AppDialog(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          PanelHeader(title: 'Class Settings', subtitle: c.name),
-          const SizedBox(height: 16),
-          const FieldLabel('Cover image'),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              height: 140,
-              child: _cover != null
-                  ? Image.memory(_cover!, fit: BoxFit.cover)
-                  : ClassThumbnail(classRoom: c, height: 140, radius: 12),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: _saving ? null : _pickCover,
-              icon: const Icon(Icons.image_outlined),
-              label: const Text('Change cover'),
-            ),
-          ),
-          const SizedBox(height: 14),
-          const FieldLabel('Subject'),
-          TextField(controller: _subject),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-                color: AppColors.blueSoft, borderRadius: BorderRadius.circular(10)),
-            child: Row(
+      maxWidth: 640,
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
               children: [
-                const Icon(Icons.info_outline_rounded, size: 18, color: AppColors.link),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Grade ${c.gradeLevel}, section ${c.section} and class code '
-                    '${c.classCode} are managed by your administrator.',
-                    style: AppText.meta.copyWith(color: AppColors.ink),
-                  ),
+                Expanded(child: Text('Edit class details', style: AppText.dialogTitle)),
+                IconButton(
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: SizedBox(
+                height: 170,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: _cover != null
+                          ? Image.memory(_cover!, fit: BoxFit.cover)
+                          : ClassThumbnail(classRoom: c, height: 170, radius: 0),
+                    ),
+                    Positioned(
+                      right: 14,
+                      bottom: 14,
+                      child: Material(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        elevation: 1,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: _saving ? null : _pickCover,
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.photo_camera_rounded, size: 20, color: AppColors.ink),
+                                SizedBox(width: 8),
+                                Text('Change cover', style: TextStyle(fontWeight: FontWeight.w700)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                    onPressed: _saving ? null : _save, child: const Text('Save changes')),
+            ),
+            const SizedBox(height: 16),
+            _pair(_readOnly('Class name', c.name), _readOnly('Section', c.section)),
+            const SizedBox(height: 14),
+            _pair(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const FieldLabel('Subject'),
+                  TextFormField(
+                    controller: _subject,
+                    maxLength: 80,
+                    decoration: const InputDecoration(counterText: ''),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Add a subject.' : null,
+                  ),
+                ],
               ),
-            ],
-          ),
-        ],
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const FieldLabel('Room'),
+                  TextFormField(
+                    controller: _room,
+                    maxLength: 60,
+                    decoration: const InputDecoration(hintText: 'e.g. Grade 4 Room', counterText: ''),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            const FieldLabel('Description'),
+            TextFormField(
+              controller: _description,
+              minLines: 3,
+              maxLines: 5,
+              maxLength: 1000,
+              decoration: const InputDecoration(hintText: 'A short welcome or what the class is about'),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                const SizedBox(width: 12),
+                FilledButton(onPressed: _saving ? null : _save, child: const Text('Save changes')),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

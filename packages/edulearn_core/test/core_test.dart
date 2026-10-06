@@ -172,4 +172,44 @@ void main() {
       expect(m.isOverdue(now), isTrue);
     });
   });
+
+  group('class stream posts', () {
+    test('formatting: bold, italic, underline, links and bullets', () {
+      final segs = parseInline('**Basahin** ang *pahina 1* at __gabay__: [aralin](https://edulearn.ph/a)');
+      expect(segs.map((s) => s.style).toList(), [
+        SegmentStyle.bold, SegmentStyle.plain, SegmentStyle.italic, SegmentStyle.plain,
+        SegmentStyle.underline, SegmentStyle.plain, SegmentStyle.link,
+      ]);
+      expect(segs.last.url, 'https://edulearn.ph/a');
+      expect(parseInline('see https://youtu.be/x').last.url, 'https://youtu.be/x');
+      final lines = parsePost('Mga dadalhin:\n• lapis\n- papel');
+      expect(lines.map((l) => l.bullet).toList(), [false, true, true]);
+      expect(plainText('**Hi** *there*'), 'Hi there');
+    });
+
+    test('a short first line becomes the headline', () {
+      expect(splitHeadline('Welcome to Quarter 1!\nMagandang araw!'),
+          (title: 'Welcome to Quarter 1!', body: 'Magandang araw!'));
+      expect(splitHeadline('Just one line'), (title: '', body: 'Just one line'));
+      expect(splitHeadline('• item one\n• item two').title, '');
+    });
+
+    test('scheduled posts go live at publishAt; drafts never do', () {
+      final at = DateTime(2026, 9, 27, 8);
+      final scheduled = Announcement(status: PostStatus.scheduled, publishAt: at, body: 'x');
+      expect(scheduled.isLive(DateTime(2026, 9, 27, 7, 59)), isFalse);
+      expect(scheduled.isLive(at), isTrue);
+      expect(scheduled.postedAt, at);
+      expect(const Announcement(status: PostStatus.draft, body: 'x').isLive(now), isFalse);
+      expect(const Announcement(body: '**Paalala:** quiz bukas').headline, 'Paalala: quiz bukas');
+    });
+
+    test('attachment size labels', () {
+      expect(formatBytes(2516582), '2.4 MB');
+      expect(formatBytes(5452595), '5.2 MB');
+      expect(formatBytes(840 * 1024), '840 KB');
+      expect(formatBytes(null), '');
+      expect(const PostAttachment(name: 'Q1_Orientation.pdf').extension, 'PDF');
+    });
+  });
 }

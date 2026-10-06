@@ -19,6 +19,7 @@ class PageHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.leading,
+    this.actions,
   });
 
   final IconData icon;
@@ -27,6 +28,9 @@ class PageHeader extends StatelessWidget {
 
   /// e.g. a back button on the class page.
   final Widget? leading;
+
+  /// Shown before the bell, e.g. the Stream page's class selector.
+  final Widget? actions;
 
   @override
   Widget build(BuildContext context) {
@@ -52,8 +56,18 @@ class PageHeader extends StatelessWidget {
       ],
     );
     return LayoutBuilder(builder: (context, c) {
-      if (c.maxWidth < 560) return titleBlock;
-      return Row(children: [Expanded(child: titleBlock), const TopBarControls()]);
+      if (c.maxWidth < 560) {
+        if (actions == null) return titleBlock;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [titleBlock, const SizedBox(height: 12), actions!],
+        );
+      }
+      return Row(children: [
+        Expanded(child: titleBlock),
+        if (actions != null) ...[actions!, const SizedBox(width: 12)],
+        const TopBarControls(),
+      ]);
     });
   }
 }

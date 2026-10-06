@@ -52,6 +52,9 @@ const PROJECT = opt('project', process.env.GCLOUD_PROJECT ?? defaultProject);
 // ------------------------------------------------------- Manila date math
 const OFFSET = 8 * 3600 * 1000;
 const DAY = 24 * 3600 * 1000;
+/** School quarter 1–4 (school year starts in June), like schoolQuarter() in edulearn_core. */
+const schoolQuarter = (d) => Math.floor(((parts(d).mo + 1 - 6 + 12) % 12) / 3) + 1;
+const TYPE_ORDER = { lesson: 1, quest: 2, quiz: 3, activity: 4, boss: 5, material: 6 };
 const parts = (d) => {
   const m = new Date(d.getTime() + OFFSET);
   return { y: m.getUTCFullYear(), mo: m.getUTCMonth(), d: m.getUTCDate(), wd: m.getUTCDay() };
@@ -143,6 +146,26 @@ const HARD = { 'Panahon ng Himagsikan': -0.14, 'Lokal na Pamahalaan': -0.11 };
 const POINTS = { quest: 20, quiz: 20, activity: 10, boss: 50, lesson: 0 };
 
 // --------------------------------------------------------------- builder
+const mc = (id, text, choices, correctIndex, explanation = '') =>
+  ({ id, text, type: 'multipleChoice', choices, correctIndex, answer: '', points: 1, explanation });
+const QUIZ_QUESTIONS = [
+  mc('q1', 'Alin sa mga sumusunod ang isang anyong lupa?', ['Bundok', 'Look ng Dagat', 'Golpo', 'Kipot'], 0),
+  mc('q2', 'Ano ang tawag sa malawak na anyong tubig na nasa pagitan ng mga kontinente?', ['Ilog', 'Karagatan', 'Lawa', 'Talon'], 1),
+  mc('q3', 'Alin ang pinakamataas na bundok sa Pilipinas?', ['Bundok Pulag', 'Bundok Apo', 'Bulkang Mayon', 'Bundok Banahaw'], 1),
+  { id: 'q4', text: 'Ang Bulkang Mayon ay matatagpuan sa Albay.', type: 'trueFalse', choices: ['Tama', 'Mali'],
+    correctIndex: 0, answer: '', points: 1, explanation: '' },
+  { id: 'q5', text: 'Ano ang tawag sa lupang napaliligiran ng tubig?', type: 'shortAnswer', choices: [],
+    correctIndex: 0, answer: 'pulo', points: 1, explanation: 'Pulo o isla ang lupang napaliligiran ng tubig.' },
+];
+const BOSS_QUESTIONS = [
+  mc('b1', 'Ano ang rehiyon ng Pilipinas na kilala sa mga bulkan?', ['Rehiyon V – Bicol', 'NCR', 'Rehiyon III', 'CAR'], 0,
+    'Nasa Bicol ang Bulkang Mayon at iba pang bulkan.'),
+  mc('b2', 'Aling rehiyon ang may pinakamahabang baybayin?', ['Rehiyon IV-B – MIMAROPA', 'CAR', 'NCR', 'Rehiyon II'], 0),
+  mc('b3', 'Alin sa mga sumusunod ang produkto ng Rehiyon IV-A?', ['Kape', 'Abaka', 'Tabako', 'Perlas'], 0),
+  mc('b4', 'Ilan ang rehiyon ng Pilipinas?', ['12', '15', '17', '20'], 2),
+  mc('b5', 'Saang rehiyon matatagpuan ang Banaue Rice Terraces?', ['CAR', 'Rehiyon I', 'Rehiyon VII', 'BARMM'], 0),
+];
+
 export function buildSeed(teacherId, now = new Date()) {
   const rand = mulberry32(20260926);
   const pick = (xs) => xs[Math.floor(rand() * xs.length)];
@@ -336,16 +359,41 @@ export function buildSeed(teacherId, now = new Date()) {
       classCode: cls.classCode, status: active ? 'active' : 'archived', studentCount: students.length,
       questCount, completionRate: cls.target.c, averageScore: cls.target.a, coverImageUrl: null,
       colorIndex: cls.colorIndex, archivedAt: active ? null : addDays(today, -45),
+      // Edit class details / Class settings
+      room: `Grade ${cls.gradeLevel} Room`,
+      description: cls.id === 'rizal-4a'
+        ? 'Magandang araw, Grade 4 – Rizal! Sama-sama tayong matuto at tuklasin ang ating bansa.' : '',
+      streamPermission: 'postAndComment', classworkNotifications: 'condensed',
+      totalPoints: 20, showOverallGrade: true,
     });
+
+    // Classwork topics: one per week ("Week 13: Mga Rehiyon ng Pilipinas").
+    const weekTopics = TOPICS[cls.gradeLevel];
+    for (let idx = 0; idx < 14; idx++) {
+      put(`classes/${cls.id}/topics/${cls.id}-t${idx}`, {
+        name: `Week ${idx + 1}: ${weekTopics[idx % weekTopics.length]}`, position: idx + 1 });
+    }
 
     for (const w of cls._work) {
       const c = cls._counters.get(w.id);
+      const idx = Number(w.id.match(/-w(\d+)-/)[1]);
       put(`classwork/${w.id}`, {
         teacherId, classId: cls.id, className: cls._className, type: w.type, title: w.title,
         description: w.description, dueDate: w.dueDate, status: w.status, points: POINTS[w.type],
         attachmentUrl: null, attachmentName: null, assignedStudentIds: [],
         submittedCount: c.submittedCount, scoreSum: round2(c.scoreSum), scoredCount: c.scoredCount,
         createdAt: addDays(w.dueDate, -5),
+        topicId: `${cls.id}-t${idx}`, quarter: schoolQuarter(w.dueDate), position: TYPE_ORDER[w.type],
+        publishAt: w.status === 'scheduled' ? addDays(w.dueDate, -3) : null,
+        attachments: [], postToStream: true, notifyStudents: true, allowLate: w.type !== 'boss',
+        ...(w.type === 'quest' ? { xpReward: 100, coinReward: 25, attempts: 3, difficulty: 'medium' } : {}),
+        ...(w.type === 'quiz' ? { timeLimitMinutes: 20, attempts: 1, shuffleQuestions: true, shuffleChoices: true,
+          showScoreImmediately: true, autoGrade: true } : {}),
+        ...(w.type === 'boss' ? { timeLimitMinutes: 30, attempts: 1, difficulty: 'hard', passingScore: 70,
+          bossId: 'kapuluan', bossHp: 100, xpReward: 75, rewardBadge: 'Rehiyon Master',
+          shuffleQuestions: true, showExplanations: true,
+          questionCount: w.id === 'rizal-4a-w12-boss' ? BOSS_QUESTIONS.length : 0 } : {}),
+        ...(w.type === 'activity' ? { submissionType: 'file', groupWork: false, rubric: [] } : {}),
       });
     }
 
@@ -424,14 +472,108 @@ export function buildSeed(teacherId, now = new Date()) {
   // ---- announcements, activity, notifications
   const ago = (h) => addHours(now, -h);
   put('announcements/seed-a1', { teacherId, classId: 'rizal-4a', pinned: false, createdAt: ago(5),
+    status: 'published', attachments: [], commentCount: 0,
     title: "Reminder: Please read Chapter 1 before Monday's quest.",
     body: 'Chapter 1 covers Rizal’s early life in Calamba. Bring your notes to class.' });
   put('announcements/seed-a2', { teacherId, classId: 'rizal-4a', pinned: false, createdAt: ago(50),
+    status: 'published', attachments: [], commentCount: 0,
     title: "Good job on the quiz! Let's keep it up!", body: 'Class average went up this week. Salamat!' });
   put('announcements/seed-a3', { teacherId, classId: null, pinned: true, createdAt: ago(28),
+    status: 'published', attachments: [], commentCount: 0,
     title: 'Field trip forms are now available', body: 'Please return the signed forms by Friday.' });
   put('announcements/seed-a4', { teacherId, classId: 'boni-5b', pinned: false, createdAt: ago(75),
+    status: 'published', attachments: [], commentCount: 0,
     title: 'Friday Boss Assessment this week', body: 'Review Aralin 1–3. Good luck, Bonifacio!' });
+
+  // ---- class stream (Stream page) for Grade 4 – Rizal, matching the design.
+  // Due dates fall after this week, so dashboard counts don't change.
+  const at = (day, h, m = 0) => { const d = new Date(day); d.setHours(h, m, 0, 0); return d; };
+  const nextMon = addDays(thisMonday, 7);
+  const rizalName = 'Grade 4 – Rizal';
+  const streamWork = [
+    { id: 'rizal-4a-stream-assign', type: 'quest', title: 'Mga Rehiyon ng Pilipinas',
+      description: 'Gumawa ng isang maikling ulat o presentasyon tungkol sa rehiyon na iyong napili.',
+      dueDate: at(nextMon, 23, 59), createdAt: at(addDays(today, -2), 14, 15) },
+    { id: 'rizal-4a-stream-quiz', type: 'quiz', title: 'Quiz: Anyong Lupa at Tubig',
+      description: 'Sagutan ang 20-item multiple choice quiz tungkol sa anyong lupa at anyong tubig ng Pilipinas.',
+      dueDate: at(addDays(nextMon, 2), 23, 59), createdAt: at(addDays(today, -3), 10, 0) },
+    { id: 'rizal-4a-stream-reflection', type: 'activity', title: 'Reading Reflection',
+      description: 'Isulat ang iyong repleksyon tungkol sa binasang materyal (5–8 pangungusap).',
+      dueDate: at(addDays(nextMon, 4), 23, 59), createdAt: at(addDays(today, -1), 9, 0) },
+    { id: 'rizal-4a-stream-material', type: 'material', title: 'Reading Material: Kasaysayan ng Pilipinas',
+      description: 'Basahin ang mga pahina 1–10 at sagutin ang gabay na tanong sa dulo ng materyal na talakayan.',
+      dueDate: at(addDays(today, -4), 13, 45), createdAt: at(addDays(today, -4), 13, 45),
+      attachmentName: 'Kasaysayan_ng_Pilipinas.pdf', attachmentSize: 5452595, commentCount: 3 },
+  ];
+  for (const w of streamWork) {
+    put(`classwork/${w.id}`, {
+      teacherId, classId: 'rizal-4a', className: rizalName, type: w.type, title: w.title,
+      description: w.description, dueDate: w.dueDate, status: 'published', points: POINTS[w.type],
+      attachmentUrl: null, attachmentName: w.attachmentName ?? null, attachmentSize: w.attachmentSize ?? null,
+      assignedStudentIds: [], submittedCount: 0, scoreSum: 0, scoredCount: 0,
+      commentCount: w.commentCount ?? 0, createdAt: w.createdAt,
+      topicId: w.type === 'material' ? 'rizal-4a-t12' : 'rizal-4a-t13', quarter: schoolQuarter(w.dueDate),
+      position: 10 + (TYPE_ORDER[w.type] ?? 0), attachments: [], postToStream: true, notifyStudents: true,
+      allowLate: true,
+      ...(w.type === 'quest' ? { xpReward: 100, coinReward: 25, attempts: 3, difficulty: 'medium' } : {}),
+      ...(w.type === 'quiz' ? { timeLimitMinutes: 20, attempts: 1, shuffleQuestions: true, shuffleChoices: true,
+        showScoreImmediately: true, autoGrade: true, questionCount: QUIZ_QUESTIONS.length } : {}),
+      ...(w.type === 'activity' ? { submissionType: 'text', groupWork: false,
+        rubric: [{ title: 'Nilalaman', description: 'Wasto at buo ang repleksyon', points: 6 },
+                 { title: 'Kalinawan', description: 'Malinaw ang pagkakasulat', points: 4 }] } : {}),
+    });
+  }
+  // Answer keys live in classwork/{id}/private/questions (teacher-only).
+  put('classwork/rizal-4a-stream-quiz/private/questions', { questions: QUIZ_QUESTIONS });
+  put(`classwork/rizal-4a-w12-boss/private/questions`, { questions: BOSS_QUESTIONS });
+
+  const welcomeAt = ago(52);
+  put('announcements/seed-welcome', { teacherId, classId: 'rizal-4a', pinned: false, status: 'published',
+    createdAt: welcomeAt, publishAt: null, commentCount: 5, title: 'Welcome to Quarter 1!',
+    body: 'Magandang araw, Grade 4 – Rizal! Sana ay maging makabuluhan at masaya ang ating paglalakbay '
+      + 'sa Araling Panlipunan ngayong unang markahan. Sama-sama nating tuklasin ang ating bansa!',
+    attachments: [{ name: 'Q1_Class_Orientation.pdf', url: null, kind: 'file', sizeBytes: 2516582, storagePath: null }] });
+  const comment = (post, id, author, mins, body) => put(`${post}/comments/${id}`, {
+    authorId: author.id, authorName: author.name, authorRole: author.role, body, attachment: null,
+    createdAt: addHours(post.includes('seed-welcome') ? welcomeAt : streamWork[3].createdAt, mins / 60) });
+  const rz = (n, name) => ({ id: `rizal-4a-s${pad(n)}`, name, role: 'student' });
+  const jean = { id: teacherId, name: 'Jean Magallanes', role: 'teacher' };
+  const welcome = 'announcements/seed-welcome';
+  comment(welcome, 'c1', rz(1, 'Maria Santos'), 32,
+    'Excited po ako sa bagong quarter, Teacher! Maraming salamat po sa malinaw na paliwanag. '
+    + 'Sana po masaya at makabuluhan ang ating klase ngayong taon. 😊');
+  comment(welcome, 'c2', rz(2, 'Juan Dela Cruz'), 45, 'Salamat po, Teacher Jean! Looking forward po sa mga bagong aralin. 💚');
+  comment(welcome, 'c3', rz(4, 'Ana Lopez'), 58,
+    'Ang ganda po ng tema ngayong quarter. Interesado po talaga ako sa kasaysayan ng Pilipinas. Maraming salamat po!');
+  comment(welcome, 'c4', rz(3, 'Carlo Reyes'), 71,
+    'Sana po marami tayong talakayan at gawain na pangkatang activity. Excited po ako makipagtulungan sa aking mga kaklase! 😊');
+  comment(welcome, 'c5', jean, 95,
+    'Maraming salamat sa inyong lahat! Excited din po ako na makasama kayo ngayong quarter. '
+    + 'Sama-sama tayong matuto at tuklasin ang ganda ng ating bansa. 🇵🇭 💚');
+  const material = 'classwork/rizal-4a-stream-material';
+  comment(material, 'c1', rz(1, 'Maria Santos'), 40, 'Teacher, kasama po ba ang pahina 10 sa babasahin?');
+  comment(material, 'c2', jean, 55, 'Oo, Maria — hanggang pahina 10, kasama ang gabay na tanong. 👍');
+  comment(material, 'c3', rz(4, 'Ana Lopez'), 90, 'Salamat po! Nabasa ko na po ang unang limang pahina.');
+
+  // Calendar → school and class events
+  const evt = (id, title, day, kind, extra = {}) => put(`calendarEvents/${id}`, {
+    teacherId, title, start: day, end: null, allDay: true, classId: null, kind, location: '', notes: '', ...extra });
+  evt('seed-ev1', 'Faculty Meeting', at(addDays(nextMon, 2), 15, 0), 'school',
+    { allDay: false, end: at(addDays(nextMon, 2), 16, 30), location: 'Faculty Room' });
+  evt('seed-ev2', 'Buwan ng Wika Program', at(addDays(nextMon, 11), 8, 0), 'school', { location: 'Covered Court' });
+  evt('seed-ev3', 'Field trip: Pambansang Museo', at(addDays(nextMon, 4), 7, 0), 'classEvent',
+    { classId: 'rizal-4a', notes: 'Dalhin ang pirmadong permission slip.' });
+
+  // A scheduled post and a draft (Stream → "All posts" filter → Scheduled / Drafts)
+  const tomorrow8 = at(addDays(today, 1), 8, 0);
+  put('announcements/seed-scheduled', { teacherId, classId: 'rizal-4a', pinned: false, status: 'scheduled',
+    createdAt: ago(1), publishAt: tomorrow8, commentCount: 0, attachments: [],
+    title: 'Paalala: Quiz sa Miyerkules',
+    body: 'Huwag kalimutan ang **Quiz: Anyong Lupa at Tubig** sa susunod na Miyerkules. Balikan ang inyong mga tala!' });
+  put('announcements/seed-draft', { teacherId, classId: 'rizal-4a', pinned: false, status: 'draft',
+    createdAt: ago(3), publishAt: null, commentCount: 0, attachments: [],
+    title: 'Gabay sa field trip',
+    body: '• Dalhin ang pirmadong form\n• Magdala ng baon at tubig\n• Isuot ang PE uniform' });
 
   const act = (id, classId, kind, title, subtitle, h) =>
     put(`activity/${id}`, { teacherId, classId, kind, title, subtitle, createdAt: ago(h) });

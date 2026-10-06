@@ -68,19 +68,22 @@ final announcementsProvider = StreamProvider.autoDispose<List<Announcement>>(
   (ref) => ref.watch(dashboardRepositoryProvider).watchAnnouncements(),
 );
 
-/// Announcements for one class (plus those posted to all classes).
+/// Live announcements for one class (plus those posted to all classes).
+/// Drafts and not-yet-due scheduled posts only show on the Stream page.
 final classAnnouncementsProvider =
     Provider.autoDispose.family<AsyncValue<List<Announcement>>, String>(
   (ref, classId) => ref.watch(announcementsProvider).whenData(
-        (l) => sortAnnouncements(l.where((a) => a.classId == null || a.classId == classId)),
+        (l) => sortAnnouncements(l.where(
+          (a) => (a.classId == null || a.classId == classId) && a.isLive(DateTime.now()),
+        )),
       ),
 );
 
 List<Announcement> sortAnnouncements(Iterable<Announcement> items) => items.toList()
   ..sort((a, b) {
     if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
-    final at = a.createdAt ?? DateTime.now();
-    final bt = b.createdAt ?? DateTime.now();
+    final at = a.postedAt ?? DateTime.now();
+    final bt = b.postedAt ?? DateTime.now();
     return bt.compareTo(at);
   });
 

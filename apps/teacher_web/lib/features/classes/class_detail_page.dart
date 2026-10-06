@@ -15,7 +15,6 @@ import 'tabs/gradebook_tab.dart';
 import 'tabs/overview_tab.dart';
 import 'tabs/stream_tab.dart';
 import 'widgets/class_actions.dart';
-import 'widgets/class_dialogs.dart';
 
 /// `/classes/:classId?tab=…` — the "Open Class" page.
 class ClassDetailPage extends ConsumerWidget {
@@ -166,7 +165,7 @@ class _Hero extends ConsumerWidget {
             label: const Text('Create Classwork'),
           ),
         OutlinedButton.icon(
-          onPressed: () => showClassSettings(context, c),
+          onPressed: () => context.go(Routes.classSettings(c.id)),
           icon: const Icon(Icons.settings_outlined, size: 20),
           label: const Text('Class Settings'),
         ),

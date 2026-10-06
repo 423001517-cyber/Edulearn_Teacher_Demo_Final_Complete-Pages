@@ -30,6 +30,10 @@ class Submission {
     this.maxScore = 20,
     this.privateFeedback = '',
     this.attachmentUrl,
+    this.attachmentName,
+    this.textResponse = '',
+    this.rubricScores = const {},
+    this.returnedAt,
   });
 
   final String id;
@@ -46,6 +50,14 @@ class Submission {
   final int maxScore;
   final String privateFeedback;
   final String? attachmentUrl;
+  final String? attachmentName;
+
+  /// Typed answer (activities with "Text response").
+  final String textResponse;
+
+  /// Points per rubric criterion title (Review submission → Rubric).
+  final Map<String, int> rubricScores;
+  final DateTime? returnedAt;
 
   factory Submission.fromDoc(Doc doc) {
     final d = dataOf(doc);
@@ -64,6 +76,15 @@ class Submission {
       maxScore: readInt(d['maxScore'], 20),
       privateFeedback: readString(d['privateFeedback']),
       attachmentUrl: readStringOrNull(d['attachmentUrl']),
+      attachmentName: readStringOrNull(d['attachmentName']),
+      textResponse: readString(d['textResponse']),
+      rubricScores: d['rubricScores'] is Map
+          ? {
+              for (final e in (d['rubricScores'] as Map).entries)
+                if (e.value is num) '${e.key}': (e.value as num).toInt(),
+            }
+          : const {},
+      returnedAt: readDate(d['returnedAt']),
     );
   }
 
@@ -75,4 +96,34 @@ class Submission {
 
   String get studentInitials => initialsOf(studentName);
   String get gradeLabel => 'Grade $gradeLevel';
+}
+
+/// What the teacher sees for one student on one classwork item.
+enum WorkState {
+  assigned('Assigned'),
+  turnedIn('Turned in'),
+  late('Late'),
+  draft('Draft grade'),
+  graded('Graded'),
+  missing('Missing');
+
+  const WorkState(this.label);
+  final String label;
+
+  /// Counts as "Turned in" on the tabs (late and draft-graded work too).
+  bool get handedIn => this == turnedIn || this == late || this == draft || this == graded;
+
+  /// Still waiting for the teacher.
+  bool get needsReview => this == turnedIn || this == late || this == draft;
+}
+
+/// Pure: a student's state for [item] given their submission (if any).
+/// Draft grade = scored but not returned yet ("Save draft").
+WorkState workStateFor(ClassworkItem item, Submission? s, DateTime now) {
+  if (s == null) {
+    return item.dueDate.isBefore(now) ? WorkState.missing : WorkState.assigned;
+  }
+  if (s.status == SubmissionStatus.returned) return WorkState.graded;
+  if (s.score != null) return WorkState.draft;
+  return s.submittedAt.isAfter(item.dueDate) ? WorkState.late : WorkState.turnedIn;
 }

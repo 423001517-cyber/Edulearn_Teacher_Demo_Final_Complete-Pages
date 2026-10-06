@@ -4,7 +4,7 @@
  */
 import { addDays, startOfDay, startOfMonth, startOfQuarter } from './time';
 
-export type ClassworkType = 'lesson' | 'quest' | 'quiz' | 'boss' | 'activity';
+export type ClassworkType = 'lesson' | 'quest' | 'quiz' | 'boss' | 'activity' | 'material';
 
 export interface WorkIn {
   id: string;
@@ -196,4 +196,4 @@ export function computeRollup(
 
 /** "quest", "quiz", "boss assessment" … for activity sentences. */
 export const noun = (type: string) =>
-  type === 'boss' ? 'boss assessment' : ['lesson', 'quest', 'quiz', 'activity'].includes(type) ? type : 'task';
+  type === 'boss' ? 'boss assessment' : ['lesson', 'quest', 'quiz', 'activity', 'material'].includes(type) ? type : 'task';

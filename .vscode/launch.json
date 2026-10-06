@@ -7,8 +7,7 @@
       "request": "launch",
       "cwd": "apps/teacher_web",
       "program": "lib/main.dart",
-      "deviceId": "chrome",
-      "args": ["--web-port", "5050"]
+      "deviceId": "chrome"
     },
     {
       "name": "Admin website",
@@ -16,14 +15,16 @@
       "request": "launch",
       "cwd": "apps/admin_web",
       "program": "lib/main.dart",
-      "deviceId": "chrome",
-      "args": ["--web-port", "5100"]
+      "deviceId": "chrome"
     }
   ],
   "compounds": [
     {
       "name": "Both websites",
-      "configurations": ["Teacher website", "Admin website"]
+      "configurations": [
+        "Teacher website",
+        "Admin website"
+      ]
     }
   ]
 }

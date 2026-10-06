@@ -176,13 +176,18 @@ export const declineClassRequest = onCall(async (req) => {
 });
 
 /** Issues a new code (e.g. the old one was shared publicly). */
+/** Admins, and the class's own teacher (Class settings → Reset code). */
 export const regenerateClassCode = onCall(async (req) => {
-  requireAdmin(req);
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Please sign in.');
+  const isAdmin = req.auth.token.role === 'admin';
   const classRef = db.collection('classes').doc(text(input(req).classId, 'Class', 128));
 
   return db.runTransaction(async (tx) => {
     const cls = await tx.get(classRef);
     if (!cls.exists) throw new HttpsError('not-found', 'Class not found.');
+    if (!isAdmin && cls.get('teacherId') !== req.auth!.uid) {
+      throw new HttpsError('permission-denied', 'Only this class’s teacher or an administrator can reset its code.');
+    }
     const old: string = cls.get('classCode') ?? '';
     let code: string | null = null;
     for (const candidate of candidateCodes(cls.get('section'), cls.get('gradeLevel'))) {

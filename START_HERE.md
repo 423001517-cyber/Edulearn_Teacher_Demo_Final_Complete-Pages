@@ -92,7 +92,9 @@ While a website is running, press **r** in its window (or save in VS Code) to se
 | `'flutter' / 'node' / 'firebase' is not recognized` | Close all windows and open them again after installing. If it still fails, restart your computer so the new programs are on PATH. |
 | Sign-in says the email or password is wrong | Run step 3 (demo data) while step 2 is running. |
 | Page stays loading, or errors about `127.0.0.1:8080` / `connection refused` | Step 2 isn't running. Start it and wait for "All emulators ready". |
-| `Port 5050/5100 is in use` | A website is already running. Close its window or the old Chrome tab first. |
+| `Failed to bind web development server … errno = 10048 … port = 5050` | The website is already running in another window (or a leftover background copy). The run scripts now pick the next free port automatically (5051, 5052…). To free 5050 again, close the other EduLearn website windows, or restart your computer. |
+| Firebase: `Failed to load function definition … Timeout after 10000` | Windows took longer than 10 seconds to load the Cloud Functions the first time. `2-start-firebase` now waits up to 60 seconds; close the Firebase window (Ctrl+C) and start it again. |
+| Firebase: `requested "node" version "22" doesn't match your global version "24"` | Harmless — it runs with your Node 24. Installing Node 22 LTS removes the message. |
 | Android build: `minSdkVersion … cannot be smaller than 23` | Open `apps/<app>/android/app/build.gradle.kts` and set `minSdk = 23` (Firebase needs it). |
 | Anything else | Copy the red error text and send it to me. |
 

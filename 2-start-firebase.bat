@@ -11,6 +11,9 @@ popd
 
 set IMPORT=
 if exist ".emulator-data\firebase-export-metadata.json" set IMPORT=--import=.emulator-data
+rem Loading the Cloud Functions can take longer than Firebase's default 10 s
+rem on Windows (antivirus scans node_modules the first time) - allow 60 s.
+set FUNCTIONS_DISCOVERY_TIMEOUT=60
 rem Only what the apps use (the websites themselves are served by Flutter).
 call firebase emulators:start --project demo-edulearn --only auth,firestore,functions,storage %IMPORT% --export-on-exit=.emulator-data
 pause

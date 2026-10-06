@@ -98,3 +98,16 @@ test('official class codes', () => {
   assert.equal(codes.length, 26);
   assert.ok(colorIndexFor('RIZAL-4A') >= 0 && colorIndexFor('RIZAL-4A') < 6);
 });
+
+test('class stream helpers', () => {
+  const { commentDelta, commentNotice, postHeadline } = require('../lib/stream/comments.js');
+  assert.equal(commentDelta(false, true), 1);
+  assert.equal(commentDelta(true, false), -1);
+  assert.equal(commentDelta(true, true), 0);
+  assert.equal(commentNotice('Maria Santos', 'Welcome to Quarter 1!'),
+    'Maria Santos commented on Welcome to Quarter 1!');
+  assert.ok(commentNotice('Ana', 'x'.repeat(80)).endsWith('…'));
+  assert.equal(postHeadline('', '**Reminder:** bring notes\nMore text'), 'Reminder: bring notes');
+  assert.equal(postHeadline('Title', 'Body'), 'Title');
+  assert.equal(postHeadline('', '• First item'), 'First item');
+});

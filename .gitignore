@@ -6,14 +6,19 @@ build/
 *.iml
 .idea/
 
+# Node (any folder)
+node_modules/
+
 # Firebase
-firebase/functions/node_modules/
 firebase/functions/lib/
-tools/seed/node_modules/
 .firebase/
 *-debug.log
 *-service-account*.json
 
-# Local Firebase emulator data (demo)
+# Local Firebase emulator data (demo) and logs
 .emulator-data/
-*-debug.log
+*.log
+
+# OS / editor clutter
+.DS_Store
+Thumbs.db

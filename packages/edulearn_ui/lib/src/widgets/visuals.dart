@@ -7,18 +7,23 @@ import '../theme.dart';
 /// renders the same thing the same way.
 
 extension ClassworkTypeVisuals on ClassworkType {
+  // Classwork design: blue lesson, green quest trophy, orange activity,
+  // purple quiz, gold Friday Boss crown, grey material.
   IconData get icon => switch (this) {
-        ClassworkType.lesson => Icons.menu_book_outlined,
-        ClassworkType.quest => Icons.assignment_turned_in_outlined,
-        ClassworkType.quiz => Icons.quiz_outlined,
-        ClassworkType.boss => Icons.emoji_events_rounded,
-        ClassworkType.activity => Icons.description_outlined,
+        ClassworkType.lesson => Icons.article_rounded,
+        ClassworkType.quest => Icons.emoji_events_rounded,
+        ClassworkType.quiz => Icons.quiz_rounded,
+        ClassworkType.boss => Icons.workspace_premium_rounded,
+        ClassworkType.activity => Icons.auto_stories_rounded,
+        ClassworkType.material => Icons.folder_copy_rounded,
       };
 
   Tone get tone => switch (this) {
-        ClassworkType.lesson || ClassworkType.quest => Tone.green,
-        ClassworkType.activity => Tone.blue,
-        ClassworkType.quiz || ClassworkType.boss => Tone.amber,
+        ClassworkType.lesson => Tone.blue,
+        ClassworkType.quest => Tone.green,
+        ClassworkType.activity || ClassworkType.boss => Tone.amber,
+        ClassworkType.quiz => Tone.purple,
+        ClassworkType.material => Tone.neutral,
       };
 }
 

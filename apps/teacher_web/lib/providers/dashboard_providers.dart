@@ -95,7 +95,7 @@ final visibleAnnouncementsProvider = Provider.autoDispose<AsyncValue<List<Announ
   final inScope = ref.watch(_inScopeProvider);
   return ref
       .watch(announcementsProvider)
-      .whenData((l) => sortAnnouncements(l.where((a) => inScope(a.classId))));
+      .whenData((l) => sortAnnouncements(l.where((a) => inScope(a.classId) && a.isLive(DateTime.now()))));
 });
 
 final dashboardPerformanceProvider = Provider.autoDispose<AsyncValue<PerformanceChartData>>((ref) {

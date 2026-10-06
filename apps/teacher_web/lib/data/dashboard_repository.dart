@@ -73,7 +73,7 @@ class DashboardRepository {
 
   Stream<List<Announcement>> watchAnnouncements() => _mine(_announcements)
       .orderBy('createdAt', descending: true)
-      .limit(20)
+      .limit(40)
       .snapshots()
       .map((s) => s.docs.map(Announcement.fromDoc).toList());
 
@@ -178,6 +178,8 @@ class DashboardRepository {
     required String classId,
     required String message,
     String? classworkId,
+    String kind = 'general',
+    bool notifyGuardian = false,
   }) =>
       _reminders.add({
         'teacherId': uid,
@@ -185,6 +187,8 @@ class DashboardRepository {
         'classId': classId,
         'classworkId': classworkId,
         'message': message,
+        'kind': kind,
+        'notifyGuardian': notifyGuardian,
         'status': 'queued',
         'createdAt': FieldValue.serverTimestamp(),
       });

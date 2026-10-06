@@ -71,6 +71,10 @@ class ReportExporter {
     return _upload(await doc.save(), '$fileName.pdf', 'application/pdf');
   }
 
+  /// An .ics calendar file (Google Calendar, Outlook, Apple Calendar).
+  Future<String> exportIcs({required String ics, required String fileName}) =>
+      _upload(Uint8List.fromList(utf8.encode(ics)), '$fileName.ics', 'text/calendar');
+
   Future<String> exportCsv({required ReportTable table, required String fileName}) {
     final buffer = StringBuffer()..writeln(table.headers.map(_csvCell).join(','));
     for (final row in table.rows) {

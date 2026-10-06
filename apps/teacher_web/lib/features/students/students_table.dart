@@ -35,9 +35,9 @@ class _StudentsTableState extends ConsumerState<StudentsTable> {
   int _page = 0;
 
   @override
-  void didUpdateWidget(StudentsTable old) {
-    super.didUpdateWidget(old);
-    if (old.classId != widget.classId) _page = 0;
+  void didUpdateWidget(StudentsTable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.classId != widget.classId) _page = 0;
   }
 
   void _setSort(_SortColumn column) => setState(() {

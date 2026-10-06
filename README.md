@@ -1,4 +1,16 @@
-# EduLearn (Flutter + Firebase)
+# EduLearn
+
+**EduLearn: A Mobile Interactive Learning Application on Araling Panlipunan for Grade 4, 5, and 6 in Philippine Cultural College**
+
+EduLearn is a hybrid role-based learning platform (mobile app + web portal) that helps Grade 4–6 Chinese-national students at Philippine Cultural College overcome language barriers in learning Araling Panlipunan through gamified quests, real-time translation support, and automated progress reporting.
+
+**Team:** Compas, Mark Lester J. · Gañola, Shierrellane Mae M. · Magallanes, Jean L. · Rey, Quinjoa D. · Siguen, Jeremie Brandon R.
+
+> **New here? Open [`START_HERE.md`](START_HERE.md)** — how to run everything on your computer.
+
+---
+
+## Apps in this repository (Flutter + Firebase)
 
 One repository for every EduLearn app, sharing one Firebase project:
 
@@ -40,7 +52,21 @@ Built in the same EduLearn style as the teacher website (no admin mockups yet �
 
 A responsive teacher website (Flutter web first; Android and iOS work too) built from the EduLearn mockups.
 
-**Built so far:** Dashboard (homepage), Classes, the Open Class page with its tabs, the filtered Students page, and Class Reports with the four detail panels (Completion, Average Score, Attendance, Missing Work). The remaining sidebar sections (Stream, Classwork, Calendar, Submissions, Gradebook, Analytics, Attendance, Rewards, Messages, Settings) already have URLs and show a placeholder page, so links to them work today and each one can be built next.
+**Built so far:** Dashboard (homepage), Classes, the Open Class page with its tabs, the filtered Students page, Class Reports with the four detail panels (Completion, Average Score, Attendance, Missing Work), and the **Stream** page with Class settings. The remaining sidebar sections (Classwork, Calendar, Submissions, Gradebook, Analytics, Attendance, Rewards, Messages, Settings) already have URLs and show a placeholder page, so links to them work today and each one can be built next.
+
+### Stream (`/stream?classId=`)
+
+| Part | What it does |
+|---|---|
+| Class banner | Cover, class name, subject, students and code. **Copy code**, and ⋮ → Class settings · Edit class details · Archive class |
+| Upcoming | Graded work due soon; **View all →** opens the class's Classwork tab |
+| Composer | Pick the class (or all classes); **B / I / U / list / link** formatting; **File / Link / Video** attachments (up to 10, 25 MB each); **Post ▾** → Post now · Schedule (date + time) · Save draft. A short first line becomes the bold headline |
+| Posts | Announcements, plus automatic posts for published classwork ("Teacher Jean posted an assignment / a quiz / a material") with Due and points chips and **View assignment / View quiz** |
+| All posts filter | Announcements · Assignments · Quizzes · Materials · Scheduled · Drafts |
+| Class comments | Side panel per post with Reply · Copy link · Delete comment, file attachments, and a Teacher badge |
+| Class settings (`/stream/settings`) | Subject, room, class code (Copy / **Reset code**), stream permissions, classwork notifications, total points, show overall grade |
+
+Class name and section are official (set by the admin), so they appear read-only in Class settings and Edit class details. Scheduled posts go live on time through the `publishScheduledPosts` function. On the local demo, scheduled functions don't run, so the website also shows a scheduled post as live once its time has passed. The class page's **Stream** tab uses the same feed.
 
 | Layer | Choice |
 |---|---|
@@ -83,6 +109,7 @@ The seed data matches the mockups:
 - 7 students with missing work, 14 submissions to review, and 9 active quests this week.
 - Rizal's report shows 75% (+12%), 82% (+8%), 94% (+4%) and 2 missing (−6), with Difficult Topics at about 68–71%.
 - 3 teachers (one disabled), 2 pending class requests, and school settings for the admin site.
+- The Grade 4 – Rizal stream: "Welcome to Quarter 1!" with 5 class comments, an assignment, a quiz and a reading material (due next week, so the dashboard numbers above don't change), one scheduled post and one draft.
 
 To check the numbers without Firebase, run `node seed.mjs --dry-run` in `tools/seed`.
 
@@ -199,7 +226,10 @@ edulearn/
 │               ├── students/             students_page · students_table · student_support_panel
 │               ├── reports/              reports_page · report_actions · widgets/ · panels/
 │               ├── classwork/            quick create · classwork form · details popover · reuse
-│               ├── announcements/        form + tile
+│               ├── announcements/        form + tile (dashboard card)
+│               ├── stream/               ③ STREAM — stream_page · class_banner · upcoming_card ·
+│               │                         stream_feed · stream_composer · post_cards ·
+│               │                         comments_panel · class_settings_page · stream_widgets
 │               └── submissions/          review popover
 │
 ├── packages/                     shared by teacher, admin and student apps
@@ -270,11 +300,11 @@ Every teacher-owned document has `teacherId`; all client queries filter by it, a
 | Collection | Written by | Used for |
 |---|---|---|
 | `teachers/{uid}` (+ `notifications/`) | app (profile), functions (notifications) | greeting, bell |
-| `classes/{id}` (+ `dailyPerformance/{yyyy-MM-dd}`, `monthlyStats/{yyyy-MM}`) | **administrator**; teacher may change only `status`, `subject`, `coverImageUrl`; functions keep counters | cards, charts, reports |
+| `classes/{id}` (+ `dailyPerformance/{yyyy-MM-dd}`, `monthlyStats/{yyyy-MM}`) | **administrator** (grade, section, code); teacher may change `status`, `subject`, `coverImageUrl`, `room`, `description`, `streamPermission`, `classworkNotifications`, `totalPoints`, `showOverallGrade`; functions keep counters | cards, charts, reports, Class settings |
 | `students/{id}` | administrator / functions (progress fields) | tables, support flags |
-| `classwork/{id}` | teacher; functions own `submittedCount`, `scoreSum`, `scoredCount` | quests, quizzes, lessons, Friday Boss |
+| `classwork/{id}` (+ `comments/`) | teacher; functions own `submittedCount`, `scoreSum`, `scoredCount`, `commentCount` | quests, quizzes, lessons, Friday Boss; stream posts |
 | `submissions/{id}` | student app; teacher grades (`score`, `privateFeedback`, `status`, `returnedAt`) | To Review, averages |
-| `announcements/{id}` | teacher (`classId: null` = all classes) | stream, homepage |
+| `announcements/{id}` (+ `comments/`) | teacher (`classId: null` = all classes); `status` published · scheduled (`publishAt`) · draft; `attachments`; functions own `commentCount` | Stream, homepage |
 | `activity/{id}` | functions | "Recent Class Activity" |
 | `missingWork/{studentId_classworkId}` | functions | Missing Work panel |
 | `attendance/{classId_yyyy-MM-dd}` | teacher / attendance module (`marks: {studentId: present\|late\|absent}`) | Attendance panel |
@@ -288,6 +318,7 @@ Storage paths:
 - `lessons/{uid}/…`: lesson files, up to 25 MB.
 - `class-covers/{uid}/…`: class cover images, up to 5 MB.
 - `reports/{uid}/…`: generated PDF and CSV reports.
+- `stream/{uid}/…`: post and class comment attachments, up to 25 MB.
 
 Consider a lifecycle rule that deletes old `reports/` files after, say, 30 days.
 
@@ -304,7 +335,9 @@ Consider a lifecycle rule that deletes old `reports/` files after, say, 30 days.
 | `deliverReminder` | reminder create | FCM push to the student's devices; prunes dead tokens |
 | `publishScheduledClasswork` | hourly | scheduled items (Friday Boss) go live on their date |
 | `nightlyRollup` | 9:00 PM Manila | student progress, missing work, class completion/average, chart point, monthly report row, "missed"/"completed" feed, teacher notifications |
-| `createClass` · `approveClassRequest` · `declineClassRequest` · `regenerateClassCode` | admin (callable) | classes with unique official codes; the teacher is notified |
+| `publishScheduledPosts` | every 5 minutes | scheduled stream posts go live at `publishAt` |
+| `onAnnouncementComment` · `onClassworkComment` | class comment create/delete | `commentCount` on the post; notifies the teacher when a student comments |
+| `createClass` · `approveClassRequest` · `declineClassRequest` · `regenerateClassCode` | admin (callable); `regenerateClassCode` also for the class's own teacher (Reset code) | classes with unique official codes; the teacher is notified |
 | `createTeacherAccount` · `teacherPasswordLink` · `setTeacherStatus` · `setAdminRole` | admin (callable) | sign-in accounts, password links, disable/enable, admin role |
 | `onClassReassigned` | class `teacherId` changes | moves the class's students, classwork, submissions, attendance and reports to the new teacher |
 

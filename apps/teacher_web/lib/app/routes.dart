@@ -1,3 +1,4 @@
+import 'package:edulearn_core/edulearn_core.dart';
 import 'package:flutter/material.dart';
 
 /// Sidebar sections. Each one owns a top-level URL.
@@ -26,6 +27,11 @@ enum NavSection {
   bool get isBuilt => const {
         NavSection.dashboard,
         NavSection.classes,
+        NavSection.stream,
+        NavSection.classwork,
+        NavSection.submissions,
+        NavSection.calendar,
+        NavSection.gradebook,
         NavSection.students,
         NavSection.reports,
       }.contains(this);
@@ -64,6 +70,32 @@ abstract final class Routes {
 
   static String classDetail(String classId, [ClassTab tab = ClassTab.overview]) =>
       _withQuery('/classes/$classId', {'tab': tab == ClassTab.overview ? null : tab.name});
+
+  /// [post]: a PostRef.encode() value — opens that post's class comments.
+  static String stream({String? classId, String? post}) =>
+      _withQuery('/stream', {'classId': classId, 'post': post});
+
+  /// [item] opens that item's preview; [topic] shows only that topic.
+  static String classwork({String? classId, String? item, String? topic}) =>
+      _withQuery('/classwork', {'classId': classId, 'item': item, 'topic': topic});
+
+  /// Full-page "Create quest" etc. [studentId] pre-assigns a remedial item.
+  static String classworkNew(ClassworkType type, {String? classId, String? studentId}) =>
+      _withQuery('/classwork/new', {'type': type.name, 'classId': classId, 'studentId': studentId});
+
+  static String classworkEdit(String itemId) => '/classwork/edit/$itemId';
+
+  /// [item] opens that classwork's student table.
+  static String submissions({String? classId, String? item}) =>
+      _withQuery('/submissions', {'classId': classId, 'item': item});
+
+  /// Full-page "Review submission" for one student.
+  static String reviewSubmission(String itemId, String studentId) =>
+      _withQuery('/submissions/review', {'item': itemId, 'student': studentId});
+
+  static String gradebook({String? classId}) => _withQuery('/gradebook', {'classId': classId});
+
+  static String classSettings(String classId) => _withQuery('/stream/settings', {'classId': classId});
 
   static String students({String? classId, String? studentId}) =>
       _withQuery('/students', {'classId': classId, 'student': studentId});

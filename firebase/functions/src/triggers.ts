@@ -3,10 +3,10 @@ import { logger } from 'firebase-functions/v2';
 import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 
 import { noun } from './rollup';
-import { addActivity, db, isNotFound, isSeed } from './shared';
+import { addActivity, soft, db, isNotFound, isSeed } from './shared';
 import { addDays, startOfDay } from './time';
 
-const COUNTER_FIELDS = ['submittedCount', 'scoreSum', 'scoredCount', 'updatedAt', 'publishedAt'];
+const COUNTER_FIELDS = ['submittedCount', 'scoreSum', 'scoredCount', 'updatedAt', 'publishedAt', 'commentCount', 'position'];
 
 const ratio = (s: DocumentData | undefined) =>
   s && s.status === 'returned' && typeof s.score === 'number' && s.maxScore > 0 ? s.score / s.maxScore : null;
@@ -92,7 +92,7 @@ export async function recountQuests(classId: string) {
     .get();
   const count = snap.docs.filter((doc) => {
     const w = doc.data();
-    return w.status === 'published' && w.type !== 'lesson';
+    return w.status === 'published' && w.type !== 'lesson' && w.type !== 'material';
   }).length;
   try {
     await db.collection('classes').doc(classId).update({ questCount: count });
@@ -115,6 +115,19 @@ export const onClassworkWritten = onDocumentWritten('classwork/{id}', async (eve
 
   const classIds = new Set<string>([before?.classId, after?.classId].filter((x): x is string => !!x));
   await Promise.all([...classIds].map(recountQuests));
+
+  // "Delete classwork … and all its submissions": remove what belonged to it.
+  if (before && !after) {
+    const id = event.params.id;
+    const writer = db.bulkWriter();
+    for (const name of ['submissions', 'missingWork']) {
+      const snap = await db.collection(name).where('classworkId', '==', id).get();
+      snap.docs.forEach((d) => writer.delete(d.ref).catch(soft(`${name}/${d.id}`)));
+    }
+    await writer.close();
+    await db.recursiveDelete(db.collection('classwork').doc(id)); // comments, answer key
+    return;
+  }
 
   if (after && after.status === 'published' && before?.status !== 'published' && !after.assignedStudentIds?.length) {
     await addActivity(after.teacherId, after.classId, 'published',

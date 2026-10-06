@@ -3,9 +3,12 @@ import 'package:edulearn_ui/edulearn_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/routes.dart';
 import '../../core/navigation.dart';
+import '../../data/stream_repository.dart';
 import '../../providers/core_providers.dart';
 import '../../providers/data_providers.dart';
+import '../stream/stream_widgets.dart';
 
 Future<void> showAnnouncementForm(BuildContext context, {Announcement? existing, String? classId}) =>
     showDialog<void>(
@@ -43,9 +46,10 @@ class _AnnouncementFormState extends ConsumerState<_AnnouncementForm> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
-      await ref.read(dashboardRepositoryProvider).saveAnnouncement(Announcement(
-            id: widget.existing?.id ?? '',
+      final base = widget.existing ?? const Announcement();
+      await ref.read(dashboardRepositoryProvider).saveAnnouncement(base.copyWith(
             classId: _classId == _allClasses ? null : _classId,
+            clearClass: _classId == _allClasses,
             title: _title.text.trim(),
             body: _body.text.trim(),
             pinned: _pinned,
@@ -147,6 +151,7 @@ class AnnouncementTile extends ConsumerWidget {
     final menu = MoreMenu<String>(
       items: [
         menuItem('view', Icons.visibility_outlined, 'View'),
+        menuItem('stream', Icons.dynamic_feed_outlined, 'Open in Stream'),
         menuItem('edit', Icons.edit_outlined, 'Edit'),
         menuItem('pin', Icons.push_pin_outlined, a.pinned ? 'Unpin' : 'Pin'),
         menuItem('delete', Icons.delete_outline_rounded, 'Delete', destructive: true),
@@ -156,6 +161,8 @@ class AnnouncementTile extends ConsumerWidget {
         switch (v) {
           case 'view':
             _view(context, a);
+          case 'stream':
+            goTo(Routes.stream(classId: a.classId, post: PostRef(PostKind.announcement, a.id).encode()));
           case 'edit':
             showAnnouncementForm(context, existing: a);
           case 'pin':
@@ -165,11 +172,11 @@ class AnnouncementTile extends ConsumerWidget {
             final ok = await confirmAction(
               context,
               title: 'Delete this announcement?',
-              message: '"${a.title}" will be removed from the class stream.',
+              message: '"${a.headline}" and its class comments will be removed from the stream.',
               confirmLabel: 'Delete',
               destructive: true,
             );
-            if (ok) await repo.deleteAnnouncement(a.id);
+            if (ok) await ref.read(streamRepositoryProvider).deletePost(a);
         }
       },
     );
@@ -186,7 +193,7 @@ class AnnouncementTile extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(a.title,
+                  Text(a.headline,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
@@ -223,11 +230,11 @@ class AnnouncementTile extends ConsumerWidget {
           const SizedBox(width: 16),
           Expanded(
             child: LayoutBuilder(builder: (context, c) {
-              final title = Text(a.title,
+              final title = Text(a.headline,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5));
-              final body = Text(a.body,
+              final body = Text(a.title.isEmpty ? '' : a.plainBody,
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.meta);
               if (c.maxWidth < 420) {
                 return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [title, body]);
@@ -254,11 +261,20 @@ class AnnouncementTile extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               PanelHeader(
-                title: a.title,
-                subtitle: a.createdAt == null ? null : longDate(a.createdAt!),
+                title: a.headline,
+                subtitle: a.postedAt == null ? null : postTime(a.postedAt!),
               ),
               const SizedBox(height: 12),
-              Text(a.body.isEmpty ? 'No message.' : a.body, style: const TextStyle(height: 1.5)),
+              if (a.body.isEmpty)
+                const Text('No message.')
+              else
+                FormattedText(a.body, style: const TextStyle(height: 1.5)),
+              if (a.attachments.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  for (final f in a.attachments) AttachmentChip(attachment: f),
+                ]),
+              ],
             ],
           ),
         ),

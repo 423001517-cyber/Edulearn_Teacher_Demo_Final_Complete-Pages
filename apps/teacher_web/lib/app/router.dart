@@ -8,13 +8,21 @@ import 'package:go_router/go_router.dart';
 
 import '../core/navigation.dart';
 import '../features/auth/login_screen.dart';
+import '../features/calendar/calendar_page.dart';
 import '../features/classes/class_detail_page.dart';
 import '../features/classes/classes_page.dart';
+import '../features/classwork/classwork_page.dart';
+import '../features/classwork/editor/classwork_editor_page.dart';
 import '../features/dashboard/dashboard_page.dart';
+import '../features/gradebook/gradebook_page.dart';
 import '../features/reports/reports_page.dart';
 import '../features/shell/app_shell.dart';
 import '../features/shell/placeholder_page.dart';
+import '../features/stream/class_settings_page.dart';
+import '../features/stream/stream_page.dart';
 import '../features/students/students_page.dart';
+import '../features/submissions/review_page.dart';
+import '../features/submissions/submissions_page.dart';
 import '../providers/core_providers.dart';
 import 'routes.dart';
 
@@ -26,7 +34,10 @@ import 'routes.dart';
 ///   /classes/:classId?tab=…         Open Class page
 ///   /students?classId=&student=     Students, optionally filtered
 ///   /reports?classId=&period=&panel= Class Reports
-///   /stream, /classwork, …          Placeholders for upcoming modules
+///   /stream?classId=&post=         Stream (announcements, classwork, comments)
+///   /stream/settings?classId=      Class settings
+///   /classwork?classId=&topic=&item= Classwork (topics, filters, create, reuse)
+///   /calendar, /submissions, …      Placeholders for upcoming modules
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(firebaseAuthProvider);
   final refresh = _AuthRefresh(auth.authStateChanges());
@@ -69,6 +80,83 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ClassDetailPage(
                     classId: state.pathParameters['classId']!,
                     tab: ClassTab.parse(state.uri.queryParameters['tab']),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: NavSection.stream.path,
+            pageBuilder: (context, state) => _page(
+              state,
+              StreamPage(
+                classId: state.uri.queryParameters['classId'],
+                post: state.uri.queryParameters['post'],
+              ),
+            ),
+            routes: [
+              GoRoute(
+                path: 'settings',
+                pageBuilder: (context, state) =>
+                    _page(state, ClassSettingsPage(classId: state.uri.queryParameters['classId'])),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: NavSection.classwork.path,
+            pageBuilder: (context, state) => _page(
+              state,
+              ClassworkPage(
+                classId: state.uri.queryParameters['classId'],
+                topicId: state.uri.queryParameters['topic'],
+                itemId: state.uri.queryParameters['item'],
+              ),
+            ),
+            routes: [
+              GoRoute(
+                path: 'new',
+                pageBuilder: (context, state) => _page(
+                  state,
+                  ClassworkEditorPage(
+                    type: ClassworkType.parse(state.uri.queryParameters['type']),
+                    classId: state.uri.queryParameters['classId'],
+                    studentId: state.uri.queryParameters['studentId'],
+                  ),
+                ),
+              ),
+              GoRoute(
+                path: 'edit/:id',
+                pageBuilder: (context, state) =>
+                    _page(state, ClassworkEditorPage(itemId: state.pathParameters['id'])),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: NavSection.gradebook.path,
+            pageBuilder: (context, state) =>
+                _page(state, GradebookPage(classId: state.uri.queryParameters['classId'])),
+          ),
+          GoRoute(
+            path: NavSection.calendar.path,
+            pageBuilder: (context, state) => _page(state, const CalendarPage()),
+          ),
+          GoRoute(
+            path: NavSection.submissions.path,
+            pageBuilder: (context, state) => _page(
+              state,
+              SubmissionsPage(
+                classId: state.uri.queryParameters['classId'],
+                itemId: state.uri.queryParameters['item'],
+              ),
+            ),
+            routes: [
+              GoRoute(
+                path: 'review',
+                pageBuilder: (context, state) => _page(
+                  state,
+                  ReviewSubmissionPage(
+                    itemId: state.uri.queryParameters['item'] ?? '',
+                    studentId: state.uri.queryParameters['student'] ?? '',
                   ),
                 ),
               ),

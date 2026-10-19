@@ -1,6 +1,8 @@
 rules_version = '2';
 
 // EduLearn — teacher website + admin website (student app rules come later).
+// Teacher pages: Dashboard … Gradebook, Students, Analytics, Attendance,
+// Rewards, Messages, Reports, Settings.
 // Teachers only ever see documents stamped with their own uid (teacherId).
 // Admins (Auth custom claim role == 'admin', set only by Cloud Functions)
 // can read school-wide and manage class assignments, rosters and settings.
@@ -39,12 +41,34 @@ service cloud.firestore {
       allow read: if (signedIn() && uid() == teacherId) || isAdmin();
       allow create: if signedIn() && uid() == teacherId
         && request.resource.data.role == 'teacher';
+      // Settings › Profile.
       allow update: if signedIn() && uid() == teacherId
-        && onlyChanges(['displayName', 'photoUrl', 'fcmTokens', 'updatedAt']);
+        && onlyChanges(['displayName', 'photoUrl', 'fcmTokens', 'updatedAt',
+                        'titleName', 'subject', 'gradeLevels', 'bio'])
+        && validProfile(request.resource.data);
+
+      function validProfile(d) {
+        return d.displayName is string && d.displayName.size() > 0 && d.displayName.size() <= 80
+          && d.get('titleName', '') is string && d.get('titleName', '').size() <= 40
+          && d.get('subject', '') is string && d.get('subject', '').size() <= 60
+          && d.get('gradeLevels', []) is list && d.get('gradeLevels', []).size() <= 12
+          && d.get('bio', '') is string && d.get('bio', '').size() <= 200;
+      }
 
       match /notifications/{id} {
         allow read, delete: if signedIn() && uid() == teacherId;
         allow update: if signedIn() && uid() == teacherId && onlyChanges(['read']);
+      }
+
+      // Settings › preferences (defaults for classwork, grading, notices).
+      match /settings/{docId} {
+        allow read: if signedIn() && uid() == teacherId;
+        allow write: if signedIn() && uid() == teacherId && docId == 'preferences'
+          && request.resource.data.notify is map
+          && request.resource.data.passingGrade is int
+          && request.resource.data.passingGrade >= 0 && request.resource.data.passingGrade <= 100
+          && request.resource.data.activityPoints is int && request.resource.data.bossPoints is int
+          && request.resource.data.calculation in ['totalPoints', 'weighted', 'none'];
       }
     }
 
@@ -129,6 +153,17 @@ service cloud.firestore {
       match /monthlyStats/{month} {
         allow read: if ownsClass(classId) || isAdmin();
         allow write: if false;
+      }
+
+      // Rewards › point rules, badges and the reward shop.
+      match /rewards/{docId} {
+        allow read: if ownsClass(classId) || isAdmin();
+        allow write: if ownsClass(classId) && docId == 'settings'
+          && request.resource.data.points is map
+          && request.resource.data.levelSize is int
+          && request.resource.data.levelSize >= 50 && request.resource.data.levelSize <= 5000
+          && request.resource.data.badges is list && request.resource.data.badges.size() <= 40
+          && request.resource.data.shop is list && request.resource.data.shop.size() <= 40;
       }
     }
 
@@ -285,14 +320,86 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------- attendance
+    // marks: studentId -> present | late | absent | excused
     match /attendance/{id} {
       allow read: if isMine(resource.data) || isAdmin();
       allow create, update: if signedIn()
         && request.resource.data.teacherId == uid()
         && ownsClass(request.resource.data.classId)
         && request.resource.data.date is timestamp
-        && request.resource.data.marks is map;
+        && request.resource.data.marks is map
+        && request.resource.data.marks.size() <= 200
+        && request.resource.data.get('notes', {}) is map
+        && request.resource.data.get('times', {}) is map;
       allow delete: if false;
+    }
+
+    // ------------------------------------------------------------- rewards
+    // Points the teacher gives by hand (and manual badges).
+    match /pointAwards/{id} {
+      allow read: if isMine(resource.data) || isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.teacherId == uid()
+        && ownsClass(request.resource.data.classId)
+        && request.resource.data.studentId is string
+        && request.resource.data.points is int
+        && request.resource.data.points >= -1000 && request.resource.data.points <= 1000
+        && request.resource.data.reason is string && request.resource.data.reason.size() <= 120
+        && (request.resource.data.badgeId == null || request.resource.data.badgeId is string)
+        && request.resource.data.createdAt == request.time;
+      allow delete: if isMine(resource.data);
+      allow update: if false;
+    }
+
+    // Created by the student app; the teacher approves or declines.
+    match /rewardRequests/{id} {
+      allow read: if isMine(resource.data) || isAdmin();
+      allow update: if isMine(resource.data)
+        && resource.data.status == 'pending'
+        && onlyChanges(['status', 'decidedAt'])
+        && request.resource.data.status in ['approved', 'declined']
+        && request.resource.data.decidedAt == request.time;
+      allow create, delete: if false;
+    }
+
+    // ------------------------------------------------------------ messages
+    // Chats with one student (dm_{teacherId}_{studentId}) or a whole class
+    // (class_{classId}). Student messages come from the student app.
+    match /conversations/{id} {
+      function validConversation(d) {
+        return d.teacherId == uid()
+          && ownsClass(d.classId)
+          && d.kind in ['student', 'group']
+          && d.title is string && d.title.size() > 0 && d.title.size() <= 120
+          && (d.kind == 'group' || ownsStudent(d.studentId))
+          && d.unread == 0;
+      }
+      // A missing conversation may be checked for (Message → start a chat).
+      allow get: if resource == null || isMine(resource.data) || isAdmin();
+      allow list: if isMine(resource.data) || isAdmin();
+      allow create: if signedIn() && validConversation(request.resource.data);
+      // The teacher can only lower the unread count (opening the chat).
+      allow update: if isMine(resource.data)
+        && onlyChanges(['lastMessage', 'lastMessageAt', 'lastRole', 'lastAuthor', 'unread',
+                        'studentsCanReply', 'quietHours'])
+        && request.resource.data.lastMessage is string && request.resource.data.lastMessage.size() <= 200
+        && request.resource.data.unread is int
+        && request.resource.data.unread >= 0 && request.resource.data.unread <= resource.data.unread
+        && request.resource.data.studentsCanReply is bool
+        && request.resource.data.quietHours is bool;
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        function convo() { return get(/databases/$(database)/documents/conversations/$(id)).data; }
+        allow read: if isMine(convo()) || isAdmin();
+        allow create: if signedIn() && isMine(convo())
+          && request.resource.data.authorId == uid()
+          && request.resource.data.authorRole == 'teacher'
+          && request.resource.data.authorName is string && request.resource.data.authorName.size() <= 120
+          && request.resource.data.body is string && request.resource.data.body.size() <= 2000
+          && request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
+      }
     }
 
     // --------------------------------------------------------------- reminders

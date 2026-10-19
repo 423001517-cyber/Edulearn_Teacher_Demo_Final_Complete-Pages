@@ -34,4 +34,14 @@ class ReportsRepository {
       .orderBy('date')
       .snapshots()
       .map((s) => s.docs.map(AttendanceDay.fromDoc).toList());
+
+  /// All of the teacher's classwork due from [from] onward (Analytics).
+  Stream<List<ClassworkItem>> watchClassworkDueFrom(DateTime from) => _db
+      .collection('classwork')
+      .where('teacherId', isEqualTo: uid)
+      .where('dueDate', isGreaterThanOrEqualTo: Timestamp.fromDate(from))
+      .orderBy('dueDate')
+      .limit(800)
+      .snapshots()
+      .map((s) => s.docs.map(ClassworkItem.fromDoc).toList());
 }

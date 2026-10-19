@@ -1,20 +1,29 @@
 /// Pure calendar helpers shared by the teacher website and student app.
 library;
 
-/// The 6×7 (or 5×7) grid of days shown for [month], starting on Sunday.
-List<DateTime> monthGrid(DateTime month) {
+/// The 6×7 (or 5×7) grid of days shown for [month], starting on Sunday
+/// (or Monday when [mondayFirst], from Settings › Calendar week starts on).
+List<DateTime> monthGrid(DateTime month, {bool mondayFirst = false}) {
   final first = DateTime(month.year, month.month, 1);
-  final start = first.subtract(Duration(days: first.weekday % 7)); // back to Sunday
+  final lead = _lead(first, mondayFirst);
   final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-  final cells = ((first.weekday % 7) + daysInMonth) > 35 ? 42 : 35;
-  return [for (var i = 0; i < cells; i++) DateTime(start.year, start.month, start.day + i)];
+  final cells = (lead + daysInMonth) > 35 ? 42 : 35;
+  return [for (var i = 0; i < cells; i++) DateTime(first.year, first.month, 1 - lead + i)];
 }
 
-/// Sunday–Saturday of the week containing [day].
-List<DateTime> weekDays(DateTime day) {
-  final start = DateTime(day.year, day.month, day.day - day.weekday % 7);
-  return [for (var i = 0; i < 7; i++) DateTime(start.year, start.month, start.day + i)];
+/// The seven days of the week containing [day] (Sunday or Monday first).
+List<DateTime> weekDays(DateTime day, {bool mondayFirst = false}) {
+  final lead = _lead(day, mondayFirst);
+  return [for (var i = 0; i < 7; i++) DateTime(day.year, day.month, day.day - lead + i)];
 }
+
+/// Short day names in grid order.
+List<String> weekdayNames({bool mondayFirst = false}) => mondayFirst
+    ? const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    : const ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/// Days between the start of the week and [d].
+int _lead(DateTime d, bool mondayFirst) => mondayFirst ? d.weekday - 1 : d.weekday % 7;
 
 bool sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
 

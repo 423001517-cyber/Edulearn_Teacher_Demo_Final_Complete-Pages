@@ -14,6 +14,22 @@ void main() {
           '/reports?classId=rizal-4a&panel=missing');
     });
 
+    test('builds URLs for Analytics, Attendance, Rewards, Messages, Settings', () {
+      expect(Routes.analytics(), '/analytics');
+      expect(Routes.analytics(classId: 'rizal-4a', range: 'week'), '/analytics?classId=rizal-4a&range=week');
+      expect(Routes.attendance(classId: 'rizal-4a', date: DateTime(2026, 10, 9)),
+          '/attendance?classId=rizal-4a&date=2026-10-09');
+      expect(Routes.rewards(classId: 'boni-5b'), '/rewards?classId=boni-5b');
+      expect(Routes.messages(studentId: 's1'), '/messages?student=s1');
+      expect(Routes.messages(groupClassId: 'rizal-4a'), '/messages?group=rizal-4a');
+      expect(Routes.settings(section: 'notifications'), '/settings?section=notifications');
+      for (final s in NavSection.values) {
+        expect(s.isBuilt, isTrue, reason: '${s.label} has a page');
+      }
+      expect(NavSection.fromPath('/messages'), NavSection.messages);
+      expect(NavSection.fromPath('/settings'), NavSection.settings);
+    });
+
     test('sidebar highlights the right section for nested URLs', () {
       expect(NavSection.fromPath('/'), NavSection.dashboard);
       expect(NavSection.fromPath('/classes'), NavSection.classes);

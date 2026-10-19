@@ -5,13 +5,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/attendance_repository.dart';
 import '../data/auth_repository.dart';
 import '../data/calendar_repository.dart';
 import '../data/classes_repository.dart';
 import '../data/classwork_repository.dart';
 import '../data/dashboard_repository.dart';
 import '../data/gradebook_repository.dart';
+import '../data/messages_repository.dart';
 import '../data/reports_repository.dart';
+import '../data/rewards_repository.dart';
+import '../data/settings_repository.dart';
 import '../data/storage_repository.dart';
 import '../data/submissions_repository.dart';
 import '../data/stream_repository.dart';
@@ -85,6 +89,34 @@ final storageRepositoryProvider = Provider.autoDispose<StorageRepository>(
 
 final reportExporterProvider = Provider.autoDispose<ReportExporter>(
   (ref) => ReportExporter(ref.watch(storageProvider), ref.watch(uidProvider)),
+);
+
+final attendanceRepositoryProvider = Provider.autoDispose<AttendanceRepository>(
+  (ref) => AttendanceRepository(ref.watch(firestoreProvider), ref.watch(uidProvider)),
+);
+
+final rewardsRepositoryProvider = Provider.autoDispose<RewardsRepository>(
+  (ref) => RewardsRepository(ref.watch(firestoreProvider), ref.watch(uidProvider)),
+);
+
+final messagesRepositoryProvider = Provider.autoDispose<MessagesRepository>(
+  (ref) => MessagesRepository(ref.watch(firestoreProvider), ref.watch(uidProvider)),
+);
+
+final settingsRepositoryProvider = Provider.autoDispose<SettingsRepository>(
+  (ref) => SettingsRepository(
+    ref.watch(firestoreProvider),
+    ref.watch(firebaseAuthProvider),
+    ref.watch(storageProvider),
+    ref.watch(functionsProvider),
+    ref.watch(uidProvider),
+  ),
+);
+
+/// Settings › defaults used across the site (new classwork, gradebooks,
+/// the calendar). The app shell keeps this loaded while signed in.
+final teacherPreferencesProvider = StreamProvider.autoDispose<TeacherPreferences>(
+  (ref) => ref.watch(settingsRepositoryProvider).watchPreferences(),
 );
 
 final teacherProvider = StreamProvider.autoDispose<Teacher?>(

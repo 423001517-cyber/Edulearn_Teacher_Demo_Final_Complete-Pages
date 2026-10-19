@@ -5,6 +5,8 @@
  * Grade 6 – Mabini (MABI-6C), one archived class, 68 active students,
  * 7 students with missing work, 14 submissions to review, 9 active quests
  * this week, and a quarter-over-quarter report trend (+12% completion …).
+ * Also attendance (with excused days and notes), chats for the Messages page,
+ * and reward requests / bonus points for the Rewards page.
  *
  * Usage (from tools/seed, after `npm install`):
  *   node seed.mjs --dry-run                 # print what would be written
@@ -181,14 +183,17 @@ export function buildSeed(teacherId, now = new Date()) {
 
   docs.push({ path: `teachers/${teacherId}`, data: {
     displayName: 'Jean Magallanes', email: EMAIL, photoUrl: null, role: 'teacher', status: 'active',
-    createdAt: addDays(now, -200) } });
+    createdAt: addDays(now, -200),
+    // Settings › Profile
+    titleName: 'Teacher Jean', subject: 'Araling Panlipunan', gradeLevels: [4, 5, 6],
+    bio: 'Magandang araw! Ako si Teacher Jean. Sabay-sabay nating tuklasin ang kasaysayan at kultura ng Pilipinas.' } });
   for (const t of EXTRA_TEACHERS) {
     docs.push({ path: `teachers/${t.uid}`, data: {
       displayName: t.displayName, email: t.email, photoUrl: null, role: 'teacher', status: t.status,
       createdAt: addDays(now, -90) } });
   }
   docs.push({ path: 'settings/school', data: {
-    schoolName: 'EduLearn Elementary School', schoolYear: '2026–2027', contactEmail: 'office@edulearn.test' } });
+    schoolName: 'Philippine Cultural College', schoolYear: '2026–2027', contactEmail: 'office@edulearn.test' } });
 
   const allSubs = [];
   const summary = { classes: [], students: 0, activeStudents: 0, missingStudents: 0, pending: 0, activeQuestsThisWeek: 0 };
@@ -292,14 +297,49 @@ export function buildSeed(teacherId, now = new Date()) {
         for (const i of spots(1 + Math.floor(rand() * 2))) if (marks[i][s.id] === 'present') marks[i][s.id] = 'late';
       }
     }
+    // Excused days (absent with a parent's note), notes, and arrival times on
+    // the latest day. A separate random stream keeps every other number the same.
+    const ex = mulberry32(7919 * cls.gradeLevel + cls.size);
+    const notes = days.map(() => ({}));
+    const times = days.map(() => ({}));
+    for (const s of students) {
+      if (ex() < 0.15 && days.length > 2) {
+        const i = Math.floor(ex() * (days.length - 1));
+        if (marks[i][s.id] === 'present') {
+          marks[i][s.id] = 'excused';
+          notes[i][s.id] = 'Medical check-up, note received';
+        }
+      }
+    }
+    const last = days.length - 1;
+    if (last >= 0) {
+      const calm = students.filter((s) => !s.absences && !s.lates && marks[last][s.id] === 'present');
+      const excusedToday = calm[calm.length - 1];
+      if (excusedToday) {
+        marks[last][excusedToday.id] = 'excused';
+        notes[last][excusedToday.id] = 'Medical check-up, note received';
+      }
+      const lateNamed = students.find((s) => s.lates);
+      if (lateNamed) notes[last][lateNamed.id] = 'Came with a parent';
+      for (const s of students) {
+        const m = marks[last][s.id];
+        if (m === 'present') times[last][s.id] = addHours(days[last], 6.8 + ex() * 0.65); // 6:48–7:27 AM
+        if (m === 'late') times[last][s.id] = addHours(days[last], 7.55 + ex() * 0.4); // 7:33–7:57 AM
+      }
+    }
     days.forEach((d, i) => put(`attendance/${cls.id}_${dayKey(d)}`, {
-      teacherId, classId: cls.id, date: d, marks: marks[i] }));
+      teacherId, classId: cls.id, date: d, marks: marks[i], notes: notes[i], times: times[i], savedAt: addHours(d, 8) }));
 
     // ---- student docs (scores filled in after pending submissions are chosen)
     for (const s of students) {
-      let absences = 0, lates = 0;
-      marks.forEach((m) => { if (m[s.id] === 'absent') absences++; if (m[s.id] === 'late') lates++; });
-      s.attendance = { attendanceRate: days.length ? round2((days.length - absences) / days.length) : null,
+      let absences = 0, lates = 0, excused = 0;
+      marks.forEach((m) => {
+        if (m[s.id] === 'absent') absences++;
+        if (m[s.id] === 'late') lates++;
+        if (m[s.id] === 'excused') excused++;
+      });
+      const counted = days.length - excused;
+      s.attendance = { attendanceRate: counted ? round2((counted - absences) / counted) : null,
         absences, lateCount: lates };
       s.classId = cls.id;
       s.gradeLevel = cls.gradeLevel;
@@ -597,15 +637,105 @@ export function buildSeed(teacherId, now = new Date()) {
   note('seed-n3', 'schedule', 'Friday Boss Assessment is tomorrow', 3, true);
   note('seed-n4', 'general', 'Welcome to EduLearn! Your classes are ready.', 48, true);
 
+  // ---- Messages: chats with students and class groups (Messages page)
+  const rizal = CLASSES.find((c) => c.id === 'rizal-4a');
+  const boni = CLASSES.find((c) => c.id === 'boni-5b');
+  const rs = rizal._students;
+  const firstOf = (name) => name.split(' ')[0];
+  let unreadMessages = 0;
+  const convo = (id, data, msgs) => {
+    const lastMsg = msgs[msgs.length - 1];
+    const fromStudent = lastMsg.role === 'student';
+    unreadMessages += data.unread ?? 0;
+    put(`conversations/${id}`, {
+      teacherId, studentsCanReply: true, quietHours: true, unread: 0, studentId: null,
+      createdAt: addHours(now, -(msgs[0].h + 1)), ...data,
+      lastMessage: lastMsg.body || (lastMsg.file ? `Sent a file: ${lastMsg.file}` : ''),
+      lastMessageAt: addHours(now, -lastMsg.h),
+      lastRole: fromStudent ? 'student' : 'teacher',
+      lastAuthor: fromStudent ? firstOf(lastMsg.name) : 'Teacher',
+    });
+    msgs.forEach((m, i) => put(`conversations/${id}/messages/m${String(i + 1).padStart(2, '0')}`, {
+      authorId: m.role === 'teacher' ? teacherId : m.id,
+      authorName: m.role === 'teacher' ? 'Teacher Jean' : m.name,
+      authorRole: m.role,
+      body: m.body,
+      createdAt: addHours(now, -m.h),
+      attachment: m.file ? { name: m.file, url: null, kind: 'file', sizeBytes: 482113, storagePath: null } : null,
+      classworkId: null, classworkTitle: null,
+    }));
+  };
+  const T = (h, body) => ({ role: 'teacher', h, body });
+  const S = (st, h, body, file) => ({ role: 'student', id: st.id, name: st.name, h, body, file });
+  const [maria, juan, carlo, ana] = rs;
+  convo(`dm_${teacherId}_${juan.id}`, { classId: 'rizal-4a', kind: 'student', studentId: juan.id, title: juan.name, unread: 1 }, [
+    S(juan, 1.3, 'Good morning po, Teacher Jean!'),
+    S(juan, 1.28, 'Nakalimutan ko pong i-submit ang activity natin kahapon. Pwede pa po ba?'),
+    T(1.1, 'Good morning, Juan! Yes, you can still turn it in until 5:00 PM today.'),
+    S(juan, 0.9, 'Salamat po! Ito po ang mapa ko. Tama na po ba ang kulay ng Rehiyon V?', 'rehiyon-map-juan.png'),
+  ]);
+  convo('class_rizal-4a', { classId: 'rizal-4a', kind: 'group', title: 'Grade 4 – Rizal' }, [
+    T(26, 'Hello, Grade 4 – Rizal! Paalala: ang Friday Boss natin ay sa Biyernes, 8:00 AM.'),
+    S(ana, 25.9, 'Yes po, Teacher! Nag-review na po kami.'),
+    S(maria, 25.8, 'Teacher, kasama po ba ang Klima at Panahon?'),
+    T(25.6, 'Hindi pa, Maria. Ang aralin lang natin ngayong linggo. Nasa Classwork ang review quest.'),
+  ]);
+  convo(`dm_${teacherId}_${carlo.id}`, { classId: 'rizal-4a', kind: 'student', studentId: carlo.id, title: carlo.name, unread: 1 }, [
+    S(carlo, 64, 'Teacher, paano po gagawin ang quest? Hindi ko po maintindihan ang mapa.'),
+  ]);
+  convo(`dm_${teacherId}_${ana.id}`, { classId: 'rizal-4a', kind: 'student', studentId: ana.id, title: ana.name }, [
+    S(ana, 170, 'Teacher, tapos ko na po lahat ng quests this week.'),
+    T(169.8, 'Great job, Ana! Ang galing mo. Keep it up!'),
+    S(ana, 169.7, 'Salamat po, Teacher!'),
+  ]);
+  const paolo = boni._students[2];
+  convo('class_boni-5b', { classId: 'boni-5b', kind: 'group', title: 'Grade 5 – Bonifacio' }, [
+    S(paolo, 240, 'Teacher, saan po makikita ang quiz natin?'),
+    T(239.5, `Nasa Classwork, ${firstOf(paolo.name)}, sa ilalim ng topic ngayong linggo.`),
+  ]);
+
+  // ---- Rewards: requests from the student app and points given by hand
+  const shop = { 'line-leader': ['Line leader for a day', 150], 'class-game': ['Pick the class review game', 200],
+    seat: ['Choose your seat for a day', 120] };
+  let pendingRequests = 0;
+  const request = (n, st, item, status, h) => {
+    if (status === 'pending') pendingRequests++;
+    put(`rewardRequests/seed-rr${n}`, {
+      teacherId, classId: 'rizal-4a', studentId: st.id, studentName: st.name, itemId: item,
+      itemName: shop[item][0], cost: shop[item][1], status, createdAt: addHours(now, -h),
+      decidedAt: status === 'pending' ? null : addHours(now, -h + 3),
+    });
+  };
+  request(1, rs[5], 'line-leader', 'pending', 2);
+  request(2, rs[6], 'class-game', 'pending', 5);
+  request(3, maria, 'seat', 'pending', 20);
+  request(4, ana, 'line-leader', 'approved', 100);
+  request(5, rs[7], 'seat', 'approved', 140);
+  request(6, rs[8], 'line-leader', 'approved', 190);
+  request(7, juan, 'seat', 'approved', 260);
+  request(8, rs[9], 'class-game', 'approved', 300);
+  request(9, rs[5], 'line-leader', 'approved', 330);
+  request(10, rs[10], 'class-game', 'declined', 200);
+  const award = (n, st, points, reason, h, badgeId = null) => put(`pointAwards/seed-pa${n}`, {
+    teacherId, classId: 'rizal-4a', studentId: st.id, studentName: st.name, points, reason, badgeId,
+    createdAt: addHours(now, -h) });
+  award(1, maria, 20, 'Tinulungan ang kaklase sa map activity', 30, 'helping-hand');
+  award(2, juan, 10, 'Great participation in class', 50);
+  award(3, carlo, 15, 'Improved on the last quiz', 80);
+  award(4, rs[6], 20, 'Helped set up the class display', 120, 'helping-hand');
+
   for (const cls of CLASSES) {
     const m = cls._latestMarks ?? {};
     const count = (v) => Object.values(m).filter((x) => x === v).length;
     summary.classes.push({
       id: cls.id, code: cls.classCode, students: cls._students.length, archived: !!cls.archived,
       missingStudents: new Set([...cls._missingSet].map((k) => k.split('_')[0])).size,
-      classwork: cls._work.length, latestAttendance: `${count('present')} present / ${count('late')} late / ${count('absent')} absent`,
+      classwork: cls._work.length,
+      latestAttendance: `${count('present')} present / ${count('late')} late / ${count('absent')} absent / ${count('excused')} excused`,
     });
   }
+  summary.unreadMessages = unreadMessages;
+  summary.pendingRewardRequests = pendingRequests;
   summary.teachers = 1 + EXTRA_TEACHERS.length;
   summary.pendingRequests = 2;
   summary.submissions = allSubs.length;
@@ -669,13 +799,15 @@ async function main() {
   if (flag('reset')) {
     console.log('Removing earlier data for this teacher…');
     const owned = ['students', 'classwork', 'submissions', 'announcements', 'activity', 'missingWork',
-      'attendance', 'reminders', 'classRequests'];
+      'attendance', 'reminders', 'classRequests', 'pointAwards', 'rewardRequests', 'calendarEvents'];
     for (const name of owned) {
       const snap = await db.collection(name).where('teacherId', '==', user.uid).get();
       const w = db.bulkWriter();
       snap.docs.forEach((d) => w.delete(d.ref));
       await w.close();
     }
+    const chats = await db.collection('conversations').where('teacherId', '==', user.uid).get();
+    for (const c of chats.docs) await db.recursiveDelete(c.ref);
     const classes = await db.collection('classes').where('teacherId', '==', user.uid).get();
     for (const c of classes.docs) await db.recursiveDelete(c.ref);
     for (const name of ['classCodes', 'classRequests']) {

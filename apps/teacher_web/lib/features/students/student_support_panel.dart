@@ -79,9 +79,25 @@ class StudentSupportPanel extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: () => showSendReminder(context, student),
-              child: const Text('Send Reminder'),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => showSendReminder(context, student),
+                    child: const Text('Send Reminder'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      goTo(Routes.messages(studentId: student.id));
+                    },
+                    child: const Text('Message'),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             OutlinedButton(

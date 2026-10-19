@@ -5,9 +5,12 @@ import 'classes_providers.dart';
 import 'classwork_providers.dart';
 import 'core_providers.dart';
 import 'data_providers.dart';
+import 'settings_providers.dart';
 
 final gradebookSettingsProvider = StreamProvider.autoDispose.family<GradebookSettings, String>(
-  (ref, classId) => ref.watch(gradebookRepositoryProvider).watchSettings(classId),
+  (ref, classId) => ref
+      .watch(gradebookRepositoryProvider)
+      .watchSettings(classId, fallback: ref.watch(preferencesProvider).gradebookDefaults),
 );
 
 final classSubmissionsProvider = StreamProvider.autoDispose.family<List<Submission>, String>(

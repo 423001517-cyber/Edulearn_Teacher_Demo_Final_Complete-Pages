@@ -32,7 +32,8 @@ export interface SubmissionIn {
 
 export interface AttendanceIn {
   date: Date;
-  marks: Record<string, 'present' | 'late' | 'absent'>;
+  /** Excused days (absent with a parent's note) don't count either way. */
+  marks: Record<string, 'present' | 'late' | 'absent' | 'excused'>;
 }
 
 export interface StudentOut {
@@ -153,6 +154,7 @@ export function computeRollup(
   let attended = 0, total = 0;
   for (const d of monthDays) {
     for (const mark of Object.values(d.marks)) {
+      if (mark === 'excused') continue;
       total++;
       if (mark !== 'absent') attended++;
     }

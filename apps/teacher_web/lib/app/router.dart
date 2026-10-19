@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/navigation.dart';
+import '../features/analytics/analytics_page.dart';
+import '../features/attendance/attendance_page.dart';
 import '../features/auth/login_screen.dart';
 import '../features/calendar/calendar_page.dart';
 import '../features/classes/class_detail_page.dart';
@@ -15,7 +17,10 @@ import '../features/classwork/classwork_page.dart';
 import '../features/classwork/editor/classwork_editor_page.dart';
 import '../features/dashboard/dashboard_page.dart';
 import '../features/gradebook/gradebook_page.dart';
+import '../features/messages/messages_page.dart';
 import '../features/reports/reports_page.dart';
+import '../features/rewards/rewards_page.dart';
+import '../features/settings/settings_page.dart';
 import '../features/shell/app_shell.dart';
 import '../features/shell/placeholder_page.dart';
 import '../features/stream/class_settings_page.dart';
@@ -37,7 +42,12 @@ import 'routes.dart';
 ///   /stream?classId=&post=         Stream (announcements, classwork, comments)
 ///   /stream/settings?classId=      Class settings
 ///   /classwork?classId=&topic=&item= Classwork (topics, filters, create, reuse)
-///   /calendar, /submissions, …      Placeholders for upcoming modules
+///   /calendar, /submissions, /gradebook
+///   /analytics?classId=&range=      Analytics (all classes or one)
+///   /attendance?classId=&date=      Attendance for one school day
+///   /rewards?classId=               Points, badges and the reward shop
+///   /messages?c=&student=&group=    Messages
+///   /settings?section=              Settings
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(firebaseAuthProvider);
   final refresh = _AuthRefresh(auth.authStateChanges());
@@ -182,6 +192,47 @@ final routerProvider = Provider<GoRouter>((ref) {
                 panel: state.uri.queryParameters['panel'],
               ),
             ),
+          ),
+          GoRoute(
+            path: NavSection.analytics.path,
+            pageBuilder: (context, state) => _page(
+              state,
+              AnalyticsPage(
+                classId: state.uri.queryParameters['classId'],
+                range: AnalyticsRange.parse(state.uri.queryParameters['range']),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: NavSection.attendance.path,
+            pageBuilder: (context, state) => _page(
+              state,
+              AttendancePage(
+                classId: state.uri.queryParameters['classId'],
+                date: dateFromKey(state.uri.queryParameters['date'] ?? ''),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: NavSection.rewards.path,
+            pageBuilder: (context, state) =>
+                _page(state, RewardsPage(classId: state.uri.queryParameters['classId'])),
+          ),
+          GoRoute(
+            path: NavSection.messages.path,
+            pageBuilder: (context, state) => _page(
+              state,
+              MessagesPage(
+                conversationId: state.uri.queryParameters['c'],
+                studentId: state.uri.queryParameters['student'],
+                groupClassId: state.uri.queryParameters['group'],
+              ),
+            ),
+          ),
+          GoRoute(
+            path: NavSection.settings.path,
+            pageBuilder: (context, state) =>
+                _page(state, SettingsPage(section: SettingsSection.parse(state.uri.queryParameters['section']))),
           ),
           for (final section in NavSection.values.where((s) => !s.isBuilt))
             GoRoute(

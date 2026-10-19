@@ -111,3 +111,18 @@ test('class stream helpers', () => {
   assert.equal(postHeadline('Title', 'Body'), 'Title');
   assert.equal(postHeadline('', '• First item'), 'First item');
 });
+
+test('rollup: excused days count neither for nor against attendance', () => {
+  const now = manila(2026, 9, 26, 21);
+  const students = [{ id: 'a', name: 'Ana Lopez' }];
+  const attendance = [
+    { date: manila(2026, 9, 21), marks: { a: 'present' } },
+    { date: manila(2026, 9, 22), marks: { a: 'excused' } },
+    { date: manila(2026, 9, 23), marks: { a: 'absent' } },
+  ];
+  const r = computeRollup(now, students, [], [], attendance);
+  const a = r.students.get('a');
+  assert.equal(a.attendanceRate, 0.5);
+  assert.equal(a.absences, 1);
+  assert.equal(r.monthAttendance, 0.5);
+});

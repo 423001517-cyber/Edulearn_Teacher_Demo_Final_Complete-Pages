@@ -9,6 +9,7 @@ import '../../../providers/classwork_providers.dart';
 import '../../../providers/core_providers.dart';
 import '../../../providers/dashboard_providers.dart';
 import '../../../providers/data_providers.dart';
+import '../../../providers/settings_providers.dart';
 import '../../shell/top_bar.dart';
 import '../../stream/stream_composer.dart' show showScheduleDialog;
 import '../classwork_dialogs.dart';
@@ -165,7 +166,10 @@ class _EditorFormState extends ConsumerState<_EditorForm> {
   late final _description = TextEditingController(text: _e?.description ?? '');
   late final _objectives = TextEditingController(text: _e?.objectives ?? '');
   late final _content = TextEditingController(text: _e?.content ?? '');
-  late final _points = TextEditingController(text: '${_e?.points ?? _type.defaultPoints}');
+  /// Settings › Classwork defaults (already loaded by the sidebar).
+  TeacherPreferences get _prefs => ref.read(preferencesProvider);
+
+  late final _points = TextEditingController(text: '${_e?.points ?? _prefs.pointsFor(_type) ?? _type.defaultPoints}');
   late final _xp = TextEditingController(text: '${_e?.xpReward ?? (_type == ClassworkType.boss ? 75 : 100)}');
   late final _coins = TextEditingController(text: '${_e?.coinReward ?? 25}');
   late final _timeLimit = TextEditingController(
@@ -179,12 +183,12 @@ class _EditorFormState extends ConsumerState<_EditorForm> {
   late int _quarter = _e?.quarter ?? schoolQuarter(DateTime.now());
   late DateTime _date = _e?.dueDate ?? _defaultDate();
   late TimeOfDay _time = _e == null
-      ? const TimeOfDay(hour: 23, minute: 59)
+      ? TimeOfDay(hour: _prefs.dueHour, minute: _prefs.dueMinute)
       : TimeOfDay(hour: _e.dueDate.hour, minute: _e.dueDate.minute);
   late int _attempts = _e?.attempts ?? (_type == ClassworkType.quest ? 3 : 1);
   late Difficulty _difficulty = _e?.difficulty ?? (_type == ClassworkType.boss ? Difficulty.hard : Difficulty.medium);
-  late bool _allowLate = _e?.allowLate ?? false;
-  late bool _postToStream = _e?.postToStream ?? true;
+  late bool _allowLate = _e?.allowLate ?? _prefs.allowLate;
+  late bool _postToStream = _e?.postToStream ?? _prefs.postToStream;
   late bool _notify = _e?.notifyStudents ?? true;
   late SubmissionType _submission = _e?.submissionType ?? SubmissionType.file;
   late bool _groupWork = _e?.groupWork ?? false;

@@ -680,3 +680,121 @@ class ArrowLabel extends StatelessWidget {
         ],
       );
 }
+
+/// A row of pill buttons where one is selected ("This week | This month",
+/// "All | Unread | Classes"). [filled]: the selected pill is solid green;
+/// otherwise it's a white pill on a grey track.
+class SegmentedPills<T> extends StatelessWidget {
+  const SegmentedPills({
+    super.key,
+    required this.value,
+    required this.options,
+    required this.labelOf,
+    required this.onChanged,
+    this.filled = false,
+    this.expand = false,
+    this.height = 40,
+  });
+
+  final T value;
+  final List<T> options;
+  final String Function(T) labelOf;
+  final ValueChanged<T> onChanged;
+  final bool filled;
+
+  /// Stretch the pills to fill the width (e.g. tabs in a narrow column).
+  final bool expand;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget pill(T option) {
+      final selected = option == value;
+      final bg = selected ? (filled ? AppColors.primary : Colors.white) : Colors.transparent;
+      final fg = selected ? (filled ? Colors.white : AppColors.ink) : AppColors.inkSoft;
+      final button = Semantics(
+        selected: selected,
+        button: true,
+        child: Material(
+          color: bg,
+          elevation: selected && !filled ? 1 : 0,
+          shadowColor: const Color(0x22000000),
+          borderRadius: BorderRadius.circular(9),
+          child: InkWell(
+            onTap: () => onChanged(option),
+            borderRadius: BorderRadius.circular(9),
+            child: Container(
+              height: height,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              alignment: Alignment.center,
+              child: Text(
+                labelOf(option),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: fg,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      return expand ? Expanded(child: button) : button;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: filled ? Colors.white : AppColors.chip,
+        borderRadius: BorderRadius.circular(12),
+        border: filled ? Border.all(color: AppColors.buttonBorder) : null,
+      ),
+      child: Row(
+        mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+        children: [
+          for (var i = 0; i < options.length; i++) ...[
+            if (i > 0) const SizedBox(width: 2),
+            pill(options[i]),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// "Label / hint ........ [switch]" — the settings-style toggle row.
+class SwitchRow extends StatelessWidget {
+  const SwitchRow({super.key, required this.label, this.hint, required this.value, required this.onChanged});
+
+  final String label;
+  final String? hint;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                if (hint != null) ...[
+                  const SizedBox(height: 2),
+                  Text(hint!, style: AppText.meta.copyWith(fontSize: 12)),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Switch(value: value, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
+}

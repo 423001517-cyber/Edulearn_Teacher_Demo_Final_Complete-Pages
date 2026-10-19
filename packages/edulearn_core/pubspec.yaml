@@ -16,6 +16,10 @@ dependencies:
   firebase_storage: ^13.2.0
   intl: ^0.20.2
   pdf: ^3.11.3
+  # Used by `pdf`. image 4.11.x needs archive 4.4+, but pdf 3.12 only allows
+  # archive below 4.1, so pub can pick a pair that doesn't compile
+  # ("The method 'decodeLazy' isn't defined"). Stay below 4.11.
+  image: ">=4.1.0 <4.11.0"
 
 dev_dependencies:
   flutter_test:

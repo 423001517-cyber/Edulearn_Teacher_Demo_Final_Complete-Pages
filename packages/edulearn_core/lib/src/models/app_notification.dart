@@ -4,6 +4,8 @@ enum NotificationKind {
   submissions,
   missingWork,
   schedule,
+  message,
+  reward,
   general;
 
   static NotificationKind parse(Object? v) => NotificationKind.values

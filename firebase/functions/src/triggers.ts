@@ -3,7 +3,7 @@ import { logger } from 'firebase-functions/v2';
 import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 
 import { noun } from './rollup';
-import { addActivity, soft, db, isNotFound, isSeed } from './shared';
+import { addActivity, soft, db, isNotFound, isSeed, wantsNotice } from './shared';
 import { addDays, startOfDay } from './time';
 
 const COUNTER_FIELDS = ['submittedCount', 'scoreSum', 'scoredCount', 'updatedAt', 'publishedAt', 'commentCount', 'position'];
@@ -65,6 +65,7 @@ export const onSubmissionWritten = onDocumentWritten('submissions/{id}', async (
 
 /** One rolling notification per classwork item: "5 new submissions for …". */
 async function bumpSubmissionNotification(s: DocumentData) {
+  if (!(await wantsNotice(s.teacherId, 'submissions'))) return;
   const ref = db
     .collection('teachers').doc(s.teacherId)
     .collection('notifications').doc(`submissions_${s.classworkId}`);

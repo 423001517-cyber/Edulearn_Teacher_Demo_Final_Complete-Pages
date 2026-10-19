@@ -11,6 +11,7 @@ import '../../core/navigation.dart';
 import '../../providers/calendar_providers.dart';
 import '../../providers/core_providers.dart';
 import '../../providers/data_providers.dart';
+import '../../providers/settings_providers.dart';
 import '../classwork/classwork_details_popover.dart';
 import '../shell/top_bar.dart';
 import 'event_dialog.dart';
@@ -45,10 +46,13 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   String get _title => switch (_view) {
         CalendarView.month || CalendarView.agenda => DateFormat('MMMM y').format(_focus),
         CalendarView.week => () {
-            final d = weekDays(_focus);
+            final d = weekDays(_focus, mondayFirst: _mondayFirst);
             return '${DateFormat('MMM d').format(d.first)} – ${DateFormat('MMM d, y').format(d.last)}';
           }(),
       };
+
+  /// Settings › Calendar week starts on.
+  bool get _mondayFirst => ref.read(preferencesProvider).weekStartsMonday;
 
   void _open(CalendarEntry e) {
     if (e.item != null) {
@@ -88,6 +92,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(preferencesProvider); // rebuild when the week start changes
     final entriesValue = ref.watch(calendarEntriesProvider(_classId));
     final entries = entriesValue.valueOrNull ?? const <CalendarEntry>[];
     final classes = ref.watch(activeClassesProvider).valueOrNull ?? const <ClassRoom>[];
@@ -160,9 +165,10 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 loadingHeight: 420,
                 data: (all) => switch (_view) {
                   CalendarView.month => _MonthGrid(
-                      month: _focus, entries: all, visible: _shown, onOpen: _open,
+                      month: _focus, entries: all, visible: _shown, onOpen: _open, mondayFirst: _mondayFirst,
                       onDay: (d) => showEventDialog(context, date: d, classId: _classId)),
-                  CalendarView.week => _WeekView(day: _focus, entries: all, visible: _shown, onOpen: _open),
+                  CalendarView.week => _WeekView(
+                      day: _focus, entries: all, visible: _shown, onOpen: _open, mondayFirst: _mondayFirst),
                   CalendarView.agenda => _AgendaView(month: _focus, entries: all, visible: _shown, onOpen: _open),
                 },
               ),
@@ -225,7 +231,16 @@ class EntryChip extends StatelessWidget {
 }
 
 class _MonthGrid extends StatelessWidget {
-  const _MonthGrid({required this.month, required this.entries, required this.visible, required this.onOpen, required this.onDay});
+  const _MonthGrid({
+    required this.month,
+    required this.entries,
+    required this.visible,
+    required this.onOpen,
+    required this.onDay,
+    this.mondayFirst = false,
+  });
+
+  final bool mondayFirst;
 
   final DateTime month;
   final List<CalendarEntry> entries;
@@ -235,9 +250,9 @@ class _MonthGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final days = monthGrid(month);
+    final days = monthGrid(month, mondayFirst: mondayFirst);
     final today = DateTime.now();
-    const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    final names = weekdayNames(mondayFirst: mondayFirst);
     return Column(children: [
       Row(children: [
         for (final n in names)
@@ -331,7 +346,15 @@ Future<void> _showDay(BuildContext context, DateTime day, List<CalendarEntry> en
     );
 
 class _WeekView extends StatelessWidget {
-  const _WeekView({required this.day, required this.entries, required this.visible, required this.onOpen});
+  const _WeekView({
+    required this.day,
+    required this.entries,
+    required this.visible,
+    required this.onOpen,
+    this.mondayFirst = false,
+  });
+
+  final bool mondayFirst;
 
   final DateTime day;
   final List<CalendarEntry> entries;
@@ -343,7 +366,7 @@ class _WeekView extends StatelessWidget {
     final today = DateTime.now();
     return IntrinsicHeight(
       child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (final d in weekDays(day))
+        for (final d in weekDays(day, mondayFirst: mondayFirst))
           Expanded(
             child: Container(
               constraints: const BoxConstraints(minHeight: 460),

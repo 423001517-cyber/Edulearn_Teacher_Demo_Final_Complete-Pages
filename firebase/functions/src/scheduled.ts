@@ -12,7 +12,7 @@ import {
   computeRollup,
   noun,
 } from './rollup';
-import { addActivity, db, soft } from './shared';
+import { addActivity, db, soft, wantsNotice } from './shared';
 import { addDays, dayKey, MANILA_TZ, monthKey, startOfDay, startOfMonth, startOfQuarter } from './time';
 import { recountQuests } from './triggers';
 
@@ -165,7 +165,7 @@ export async function rollupClass(classDoc: QueryDocumentSnapshot, now = new Dat
 
   // Teacher notifications
   const notifications = db.collection('teachers').doc(teacherId).collection('notifications');
-  if (r.studentsWithMissing > 0) {
+  if (r.studentsWithMissing > 0 && (await wantsNotice(teacherId, 'missingWork'))) {
     writer.set(notifications.doc(`missing_${classId}`), {
       kind: 'missingWork',
       title: `${r.studentsWithMissing} student${r.studentsWithMissing === 1 ? ' has' : 's have'} missing work in ${className}`,

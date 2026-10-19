@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/routes.dart';
 import '../../providers/core_providers.dart';
+import '../../providers/messages_providers.dart';
 import 'top_bar.dart';
 
 class Sidebar extends ConsumerWidget {
@@ -17,6 +18,9 @@ class Sidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final teacher = ref.watch(teacherProvider).valueOrNull;
+    final unread = ref.watch(unreadMessageCountProvider);
+    // Keep Settings defaults loaded so other pages can use them right away.
+    ref.watch(teacherPreferencesProvider);
     return Container(
       width: compact ? 84 : 232,
       color: AppColors.sidebar,
@@ -35,6 +39,7 @@ class Sidebar extends ConsumerWidget {
                       section: s,
                       selected: s == current,
                       compact: compact,
+                      badge: s == NavSection.messages ? unread : 0,
                       onTap: () {
                         onNavigate?.call();
                         context.go(s.path);
@@ -111,12 +116,16 @@ class _NavTile extends StatelessWidget {
     required this.selected,
     required this.compact,
     required this.onTap,
+    this.badge = 0,
   });
 
   final NavSection section;
   final bool selected;
   final bool compact;
   final VoidCallback onTap;
+
+  /// Unread count (Messages).
+  final int badge;
 
   @override
   Widget build(BuildContext context) {
@@ -134,14 +143,32 @@ class _NavTile extends StatelessWidget {
             child: Row(
               mainAxisAlignment: compact ? MainAxisAlignment.center : MainAxisAlignment.start,
               children: [
-                Icon(section.icon, size: 21, color: color),
+                Badge(
+                  isLabelVisible: compact && badge > 0,
+                  backgroundColor: AppColors.gold,
+                  textColor: const Color(0xFF3B2A00),
+                  label: Text('$badge'),
+                  child: Icon(section.icon, size: 21, color: color),
+                ),
                 if (!compact) ...[
                   const SizedBox(width: 12),
-                  Text(section.label,
-                      style: TextStyle(
-                          color: color,
-                          fontSize: 13.5,
-                          fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
+                  Expanded(
+                    child: Text(section.label,
+                        style: TextStyle(
+                            color: color,
+                            fontSize: 13.5,
+                            fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
+                  ),
+                  if (badge > 0)
+                    Container(
+                      constraints: const BoxConstraints(minWidth: 22),
+                      height: 22,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(color: AppColors.gold, borderRadius: BorderRadius.circular(11)),
+                      child: Text('$badge',
+                          style: const TextStyle(color: Color(0xFF3B2A00), fontSize: 12, fontWeight: FontWeight.w800)),
+                    ),
                 ],
               ],
             ),
@@ -149,6 +176,8 @@ class _NavTile extends StatelessWidget {
         ),
       ),
     );
-    return compact ? Tooltip(message: section.label, child: tile) : tile;
+    return compact
+        ? Tooltip(message: badge > 0 ? '${section.label} ($badge unread)' : section.label, child: tile)
+        : tile;
   }
 }

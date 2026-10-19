@@ -8,6 +8,7 @@ import '../../app/routes.dart';
 import '../../core/navigation.dart';
 import '../../providers/classwork_providers.dart';
 import '../../providers/core_providers.dart';
+import '../../providers/settings_providers.dart';
 import '../../providers/submissions_providers.dart';
 import '../shell/top_bar.dart';
 import '../stream/stream_widgets.dart';
@@ -85,7 +86,8 @@ class _ReviewViewState extends ConsumerState<_ReviewView> {
   late final Map<String, int> _rubric = {
     for (final c in _item.rubric) c.title: _s?.rubricScores[c.title] ?? c.points,
   };
-  bool _notify = true;
+  /// Starts from Settings › "Tell students when a grade is returned".
+  late bool _notify = ref.read(preferencesProvider).notifyOnGrade;
   bool _saving = false;
 
   @override

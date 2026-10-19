@@ -24,6 +24,18 @@ void main() {
     expect(find.byType(ProgressBar), findsOneWidget);
   });
 
+  testWidgets('SegmentedPills reports the tapped option', (tester) async {
+    String? picked;
+    await tester.pumpWidget(host(SegmentedPills<String>(
+      value: 'week',
+      options: const ['week', 'month', 'quarter'],
+      labelOf: (v) => 'This $v',
+      onChanged: (v) => picked = v,
+    )));
+    await tester.tap(find.text('This month'));
+    expect(picked, 'month');
+  });
+
   testWidgets('Archive Class stays disabled until the checkbox is ticked', (tester) async {
     const rizal = ClassRoom(id: 'rizal-4a', teacherId: 't', gradeLevel: 4, section: 'Rizal', classCode: 'RIZAL-4A');
     bool? result;

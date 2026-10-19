@@ -16,7 +16,27 @@ DateTime nextWeekday(DateTime from, int weekday) {
   return DateTime(from.year, from.month, from.day + diff);
 }
 
+/// "2026-10-19" — the Manila calendar day, used in document ids.
+String dateKey(DateTime d) =>
+    '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+/// Saturday or Sunday.
+bool isWeekend(DateTime d) => d.weekday == DateTime.saturday || d.weekday == DateTime.sunday;
+
+/// The nearest school day (Mon–Fri) [step] days away: -1 = previous, 1 = next.
+DateTime nextSchoolDay(DateTime from, int step) {
+  var d = addDays(startOfDay(from), step);
+  while (isWeekend(d)) {
+    d = addDays(d, step);
+  }
+  return d;
+}
+
+/// "7:05 AM"
+String clockText(DateTime d) => DateFormat('h:mm a').format(d);
+
 String monthAbbr(DateTime d) => DateFormat('MMM').format(d);
+String monthName(DateTime d) => DateFormat('MMMM').format(d);
 String dayMonth(DateTime d) => DateFormat('MMM d').format(d);
 String weekdayName(DateTime d) => DateFormat('EEEE').format(d);
 String longDate(DateTime d) => DateFormat('EEE, MMM d, y').format(d);

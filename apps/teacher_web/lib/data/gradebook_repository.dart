@@ -16,8 +16,10 @@ class GradebookRepository {
   DocumentReference<Json> _settings(String classId) =>
       _db.collection('classes').doc(classId).collection('gradebook').doc('settings');
 
-  Stream<GradebookSettings> watchSettings(String classId) =>
-      _settings(classId).snapshots().map((d) => GradebookSettings.fromMap(d.data()));
+  /// [fallback] is used until the class's settings are saved
+  /// (Settings › Grading defaults).
+  Stream<GradebookSettings> watchSettings(String classId, {GradebookSettings fallback = const GradebookSettings()}) =>
+      _settings(classId).snapshots().map((d) => d.exists ? GradebookSettings.fromMap(d.data()) : fallback);
 
   Future<void> saveSettings(String classId, GradebookSettings s) => _settings(classId).set(s.toMap());
 

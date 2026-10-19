@@ -5,7 +5,10 @@ import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import { db, soft } from '../shared';
 
 /** Everything a teacher sees is stamped with teacherId; these follow the class. */
-const CLASS_SCOPED = ['students', 'classwork', 'submissions', 'announcements', 'activity', 'missingWork', 'attendance'];
+const CLASS_SCOPED = [
+  'students', 'classwork', 'submissions', 'announcements', 'activity', 'missingWork', 'attendance',
+  'conversations', 'pointAwards', 'rewardRequests',
+];
 
 /**
  * When an admin reassigns a class to another teacher, move every document

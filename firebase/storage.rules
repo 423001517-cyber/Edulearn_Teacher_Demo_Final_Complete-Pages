@@ -24,6 +24,14 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
+    // Settings › Profile photo (JPG/PNG, 2 MB).
+    match /profile-photos/{uid}/{file} {
+      allow read: if request.auth != null;
+      allow write: if isOwner(uid)
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/(png|jpeg)');
+    }
+
     // Generated PDF / CSV reports. Only the teacher can list or write them;
     // the download URL (with its token) is what gets shared.
     match /reports/{uid}/{file} {

@@ -34,8 +34,9 @@ enum ScoreBand {
 
 /// The status pill in the Students table.
 enum Standing {
-  onTrack('On Track'),
-  needsSupport('Needs Support'),
+  onTrack('On track'),
+  watch('Watch'),
+  needsSupport('Needs support'),
   excellent('Excellent');
 
   const Standing(this.label);
@@ -120,7 +121,8 @@ class Student {
   ScoreBand? get band => averageScore == null ? null : ScoreBand.of(averageScore!);
 
   Standing standing(DateTime now) {
-    if (supportFlag(now) != null) return Standing.needsSupport;
+    final flag = supportFlag(now);
+    if (flag != null) return flag.level == SupportLevel.urgent ? Standing.needsSupport : Standing.watch;
     if ((averageScore ?? 0) >= 0.9) return Standing.excellent;
     return Standing.onTrack;
   }

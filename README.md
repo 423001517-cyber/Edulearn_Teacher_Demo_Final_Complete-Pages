@@ -16,7 +16,7 @@ One repository for every EduLearn app, sharing one Firebase project:
 
 | App | Folder | Status |
 |---|---|---|
-| Teacher website | `apps/teacher_web` | ✅ Homepage (Dashboard) + Classes built |
+| Teacher website | `apps/teacher_web` | ✅ Every sidebar page built (Dashboard → Settings) |
 | Admin website | `apps/admin_web` | ✅ Dashboard, Teachers, Classes & codes, Class Requests, Students, School Reports, Settings |
 | Student app (Android/iOS) | `apps/student_app` | 🔜 waiting for designs |
 
@@ -52,7 +52,18 @@ Built in the same EduLearn style as the teacher website (no admin mockups yet �
 
 A responsive teacher website (Flutter web first; Android and iOS work too) built from the EduLearn mockups.
 
-**Built so far:** Dashboard (homepage), Classes, the Open Class page with its tabs, the filtered Students page, Class Reports with the four detail panels (Completion, Average Score, Attendance, Missing Work), and the **Stream** page with Class settings. The remaining sidebar sections (Classwork, Calendar, Submissions, Gradebook, Analytics, Attendance, Rewards, Messages, Settings) already have URLs and show a placeholder page, so links to them work today and each one can be built next.
+**Built:** every sidebar page — Dashboard, Classes (+ the Open Class page and its tabs), Stream (+ Class settings), Classwork, Calendar, Submissions (+ Review), Gradebook, Students, Analytics, Attendance, Rewards, Messages, Reports (+ the four detail panels) and Settings.
+
+### Newest pages
+
+| Page | URL | What it does |
+|---|---|---|
+| Students | `/students?classId=&student=` | Stat cards (total, active this week, missing work, needs support), the **Students Directory** (search · grade · section · status filters, sortable columns, **Export List** CSV, pages), and **Students Needing Support** with the reason (“2 missing works • Average score below 75%”). Status pills: On track · Watch · Needs support · Excellent |
+| Analytics | `/analytics?classId=&range=` | All classes or one; This week / month / quarter. Average score and completion (with the change from the period before), active this week, below passing; score trend per class; mastery by topic; score by classwork type; grade distribution; Insights with a next step; lowest-scoring classwork; most improved / needs support; **Export report** (PDF) |
+| Attendance | `/attendance?classId=&date=` | One school day per class: tap **P / L / A / E** (present, late, absent, excused) per student, notes, time in, **Mark all present**, **Save attendance**, unsaved-changes warning; month heatmap (tap a day), needs follow-up (2+ absences or 3+ lates), weekly rates, **Export month** (CSV). Excused days don’t count for or against the rate |
+| Rewards | `/rewards?classId=` | Points are earned automatically from submissions (quests, activities, perfect quizzes, passing the Friday Boss, on time) plus points you **Give** by hand; levels, badges (worked out from rules, or given by hand), on-time streaks, leaderboard (week / month / all time), reward shop, and approving or declining reward requests from the student app |
+| Messages | `/messages?c=&student=&group=` | Chats with one student or a whole class; unread counts (also on the sidebar), search, All / Unread / Classes, file attachments, **Share classwork**, quick replies, and the student’s grade / missing / attendance beside the chat. “Message” buttons on Students, Attendance and Analytics open the right chat |
+| Settings | `/settings?section=` | Profile (name, what students call you, subject, grade levels, welcome message, photo); notifications (website / email per topic — the functions respect the website switches); classwork defaults (activity and Friday Boss points, due time, late work, notify on return, post to Stream, leaderboard); grading defaults (used until a class saves its own Gradebook settings); calendar week start; change password; sign out of all devices |
 
 ### Stream (`/stream?classId=`)
 
@@ -213,12 +224,14 @@ edulearn/
 │           ├── app/                      app.dart · router.dart (every URL) · routes.dart
 │           ├── core/                     navigation.dart (toast, goTo)
 │           ├── data/                     teacher-only Firestore access (filtered by teacherId)
-│           │   auth · dashboard · classes · reports · storage repositories
+│           │   auth · dashboard · classes · classwork · submissions · calendar · gradebook ·
+│           │   reports · attendance · rewards · messages · settings · storage repositories
 │           ├── providers/                Riverpod state
-│           │   core · data (shared live streams) · dashboard · classes · reports
+│           │   core · data (shared live streams) · dashboard · classes · reports · analytics ·
+│           │   attendance · rewards · messages · settings · …
 │           └── features/
 │               ├── auth/                 login_screen
-│               ├── shell/                sidebar · top bar (bell, profile) · placeholders
+│               ├── shell/                sidebar · top bar (bell, profile) · class selector
 │               ├── dashboard/            ① HOMEPAGE — dashboard_page + widgets/
 │               ├── classes/              ② CLASSES — classes_page · class_detail_page
 │               │   ├── tabs/             overview · stream · classwork · gradebook · analytics
@@ -230,7 +243,14 @@ edulearn/
 │               ├── stream/               ③ STREAM — stream_page · class_banner · upcoming_card ·
 │               │                         stream_feed · stream_composer · post_cards ·
 │               │                         comments_panel · class_settings_page · stream_widgets
-│               └── submissions/          review popover
+│               ├── submissions/          queue · review page · review popover
+│               ├── calendar/             calendar_page · event_dialog
+│               ├── gradebook/            gradebook_page · gradebook_dialogs
+│               ├── analytics/            analytics_page · analytics_cards
+│               ├── attendance/           attendance_page · attendance_widgets
+│               ├── rewards/              rewards_page · rewards_dialogs
+│               ├── messages/             messages_page · message_thread · message_info · dialogs
+│               └── settings/             settings_page · settings_dialogs (password)
 │
 ├── packages/                     shared by teacher, admin and student apps
 │   ├── edulearn_core/            no UI: data models + logic (incl. ClassRequest,
@@ -238,8 +258,9 @@ edulearn/
 │   │   ├── lib/edulearn_core.dart        import this one file
 │   │   ├── lib/src/models/               ClassRoom, Student, ClassworkItem, Submission, …
 │   │   ├── lib/src/dates.dart            Manila-aware dates, "2 hours ago"
-│   │   ├── lib/src/reports/              report_math · report_exporter (PDF/CSV)
-│   │   └── test/core_test.dart
+│   │   ├── lib/src/reports/              report_math · analytics_math · report_exporter (PDF/CSV)
+│   │   ├── lib/src/rewards/              rewards_math (points, levels, badges, streaks)
+│   │   └── test/core_test.dart · new_pages_test.dart
 │   └── edulearn_ui/              look & feel
 │       ├── lib/edulearn_ui.dart          import this one file
 │       ├── lib/src/theme.dart            EduLearn colors, fonts, breakpoints
@@ -299,7 +320,7 @@ Every teacher-owned document has `teacherId`; all client queries filter by it, a
 
 | Collection | Written by | Used for |
 |---|---|---|
-| `teachers/{uid}` (+ `notifications/`) | app (profile), functions (notifications) | greeting, bell |
+| `teachers/{uid}` (+ `notifications/`, `settings/preferences`) | app (profile: `displayName`, `titleName`, `subject`, `gradeLevels`, `bio`, `photoUrl`; Settings preferences), functions (notifications) | greeting, bell, Settings |
 | `classes/{id}` (+ `dailyPerformance/{yyyy-MM-dd}`, `monthlyStats/{yyyy-MM}`) | **administrator** (grade, section, code); teacher may change `status`, `subject`, `coverImageUrl`, `room`, `description`, `streamPermission`, `classworkNotifications`, `totalPoints`, `showOverallGrade`; functions keep counters | cards, charts, reports, Class settings |
 | `students/{id}` | administrator / functions (progress fields) | tables, support flags |
 | `classwork/{id}` (+ `comments/`) | teacher; functions own `submittedCount`, `scoreSum`, `scoredCount`, `commentCount` | quests, quizzes, lessons, Friday Boss; stream posts |
@@ -307,7 +328,11 @@ Every teacher-owned document has `teacherId`; all client queries filter by it, a
 | `announcements/{id}` (+ `comments/`) | teacher (`classId: null` = all classes); `status` published · scheduled (`publishAt`) · draft; `attachments`; functions own `commentCount` | Stream, homepage |
 | `activity/{id}` | functions | "Recent Class Activity" |
 | `missingWork/{studentId_classworkId}` | functions | Missing Work panel |
-| `attendance/{classId_yyyy-MM-dd}` | teacher / attendance module (`marks: {studentId: present\|late\|absent}`) | Attendance panel |
+| `attendance/{classId_yyyy-MM-dd}` | teacher (Attendance page): `marks: {studentId: present\|late\|absent\|excused}`, `notes`, `times` | Attendance page, Attendance panel, nightly rates |
+| `classes/{id}/rewards/settings` | teacher | point rules, level size, badges, reward shop |
+| `pointAwards/{id}` | teacher (Give points, manual badges) | Rewards |
+| `rewardRequests/{id}` | student app creates; teacher approves / declines | Rewards |
+| `conversations/{id}` (+ `messages/`) | teacher; student app adds student messages (`onConversationMessage` keeps `unread` and the preview) | Messages |
 | `reminders/{id}` | teacher → delivered by FCM function | Send Reminder |
 | `classRequests/{id}` | teacher creates; admin approves/declines via functions | "+ Request New Class" |
 | `classCodes/{code}` | functions | keeps official class codes unique (`{classId}`) |
@@ -318,7 +343,8 @@ Storage paths:
 - `lessons/{uid}/…`: lesson files, up to 25 MB.
 - `class-covers/{uid}/…`: class cover images, up to 5 MB.
 - `reports/{uid}/…`: generated PDF and CSV reports.
-- `stream/{uid}/…`: post and class comment attachments, up to 25 MB.
+- `stream/{uid}/…`: post, class comment and chat attachments, up to 25 MB.
+- `profile-photos/{uid}/…`: Settings profile photo (JPG/PNG, up to 2 MB).
 
 Consider a lifecycle rule that deletes old `reports/` files after, say, 30 days.
 
@@ -339,7 +365,12 @@ Consider a lifecycle rule that deletes old `reports/` files after, say, 30 days.
 | `onAnnouncementComment` · `onClassworkComment` | class comment create/delete | `commentCount` on the post; notifies the teacher when a student comments |
 | `createClass` · `approveClassRequest` · `declineClassRequest` · `regenerateClassCode` | admin (callable); `regenerateClassCode` also for the class's own teacher (Reset code) | classes with unique official codes; the teacher is notified |
 | `createTeacherAccount` · `teacherPasswordLink` · `setTeacherStatus` · `setAdminRole` | admin (callable) | sign-in accounts, password links, disable/enable, admin role |
-| `onClassReassigned` | class `teacherId` changes | moves the class's students, classwork, submissions, attendance and reports to the new teacher |
+| `onClassReassigned` | class `teacherId` changes | moves the class's students, classwork, submissions, attendance, chats, rewards and reports to the new teacher |
+| `onConversationMessage` | chat message create | student messages: conversation preview, unread count, bell notice |
+| `onRewardRequest` | reward request create | “Andrea wants Line leader for a day” notice |
+| `signOutEverywhere` | callable (any teacher) | Settings › Sign out of all devices |
+
+Before writing a bell notification, the functions check the teacher's **Settings › Notifications** website switches.
 
 The rollup math lives in `firebase/functions/src/rollup.ts` (no Firebase) and is unit-tested: `cd firebase/functions && npm test`.
 

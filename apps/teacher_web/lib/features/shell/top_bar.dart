@@ -156,9 +156,11 @@ class ProfileMenu extends ConsumerWidget {
       onSelected: (action) async {
         switch (action) {
           case _ProfileAction.profile:
+            context.go(Routes.settings(section: 'profile'));
           case _ProfileAction.notificationSettings:
+            context.go(Routes.settings(section: 'notifications'));
           case _ProfileAction.accountSettings:
-            context.go(NavSection.settings.path);
+            context.go(Routes.settings(section: 'security'));
           case _ProfileAction.help:
             showDialog<void>(
               context: context,
@@ -336,6 +338,8 @@ class _NotificationTile extends ConsumerWidget {
         NotificationKind.submissions => NavSection.submissions.path,
         NotificationKind.missingWork => Routes.students(),
         NotificationKind.schedule => NavSection.classwork.path,
+        NotificationKind.message => NavSection.messages.path,
+        NotificationKind.reward => NavSection.rewards.path,
         NotificationKind.general => Routes.dashboard,
       };
 

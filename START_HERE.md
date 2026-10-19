@@ -39,6 +39,8 @@ On **Windows**, double-click the `.bat` files. On **Mac/Linux**, run the `.sh` f
 
 > **Already ran `1-setup` before this version?** Double-click `add-platform-folders` once. It adds the `android`, `ios`, `windows`, `macos` and `linux` folders without touching your code.
 
+> **Updating from an older zip?** Copy the new files over your folder (keep your `.git` folder), close and restart step 2 so Firebase loads the new security rules and functions, run step 3 once so the demo has chats, rewards and the new attendance details, then step 4. No new packages were added, so `1-setup` isn't needed again.
+
 **Sign in with:**
 - Teacher website: `jean@edulearn.test` / `edulearn123`
 - Admin website: `admin@edulearn.test` / `edulearn123`
@@ -96,6 +98,8 @@ While a website is running, press **r** in its window (or save in VS Code) to se
 | Firebase: `Failed to load function definition … Timeout after 10000` | Windows took longer than 10 seconds to load the Cloud Functions the first time. `2-start-firebase` now waits up to 60 seconds; close the Firebase window (Ctrl+C) and start it again. |
 | Firebase: `requested "node" version "22" doesn't match your global version "24"` | Harmless — it runs with your Node 24. Installing Node 22 LTS removes the message. |
 | Android build: `minSdkVersion … cannot be smaller than 23` | Open `apps/<app>/android/app/build.gradle.kts` and set `minSdk = 23` (Firebase needs it). |
+| Messages / Rewards / Settings show “permission-denied” | Firebase is still using old security rules. Close the Firebase window (Ctrl+C) and run step 2 again. |
+| Settings › Sign out of all devices fails with `not-found` | The Cloud Functions didn't load. Restart step 2 and wait for "All emulators ready". |
 | Anything else | Copy the red error text and send it to me. |
 
 ---

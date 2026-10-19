@@ -40,3 +40,19 @@ export const soft = (what: string) => (e: unknown) => {
   logger.warn(`Write skipped: ${what}`, { error: String(e) });
   return undefined;
 };
+
+/** Settings › Notifications topics (teachers/{uid}/settings/preferences). */
+export type NotifyTopic = 'submissions' | 'missingWork' | 'messages' | 'comments' | 'rewards';
+
+/**
+ * False only when the teacher switched off the website notice for [topic].
+ * (Email choices are stored too, for when the school connects an email service.)
+ */
+export async function wantsNotice(teacherId: string, topic: NotifyTopic): Promise<boolean> {
+  try {
+    const snap = await db.collection('teachers').doc(teacherId).collection('settings').doc('preferences').get();
+    return snap.get(`notify.${topic}.web`) !== false;
+  } catch {
+    return true;
+  }
+}

@@ -3,7 +3,7 @@ import { logger } from 'firebase-functions/v2';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 
-import { db, isNotFound, isSeed } from '../shared';
+import { db, isNotFound, isSeed, wantsNotice } from '../shared';
 import { MANILA_TZ } from '../time';
 import { commentDelta, commentNotice, postHeadline } from './comments';
 
@@ -60,7 +60,7 @@ async function onComment(
   if (delta > 0 && after?.authorRole === 'student') {
     const post = await postRef.get();
     const teacherId = post.get('teacherId');
-    if (!teacherId) return;
+    if (!teacherId || !(await wantsNotice(teacherId, 'comments'))) return;
     await db.collection('teachers').doc(teacherId).collection('notifications').add({
       kind: 'general',
       title: commentNotice(after.authorName, postHeadline(post.get('title'), post.get('body'))),

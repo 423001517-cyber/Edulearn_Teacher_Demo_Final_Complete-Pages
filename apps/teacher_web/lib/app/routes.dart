@@ -23,18 +23,9 @@ enum NavSection {
   final IconData icon;
   final String path;
 
-  /// Sections that have a real page so far. The rest show a placeholder.
-  bool get isBuilt => const {
-        NavSection.dashboard,
-        NavSection.classes,
-        NavSection.stream,
-        NavSection.classwork,
-        NavSection.submissions,
-        NavSection.calendar,
-        NavSection.gradebook,
-        NavSection.students,
-        NavSection.reports,
-      }.contains(this);
+  /// Sections that have a real page. (Every section is built now; a new
+  /// section added here shows a placeholder until its page exists.)
+  bool get isBuilt => true;
 
   static NavSection fromPath(String path) {
     for (final s in values) {
@@ -104,6 +95,24 @@ abstract final class Routes {
   /// detail panel on arrival.
   static String reports({String? classId, String? period, String? panel}) =>
       _withQuery('/reports', {'classId': classId, 'period': period, 'panel': panel});
+
+  /// [range]: week | month | quarter.
+  static String analytics({String? classId, String? range}) =>
+      _withQuery('/analytics', {'classId': classId, 'range': range});
+
+  /// [date]: the school day to open (defaults to today).
+  static String attendance({String? classId, DateTime? date}) =>
+      _withQuery('/attendance', {'classId': classId, 'date': date == null ? null : dateKey(date)});
+
+  static String rewards({String? classId}) => _withQuery('/rewards', {'classId': classId});
+
+  /// Opens a conversation: by id, or the chat with [studentId] (created if
+  /// needed), or the class group of [groupClassId].
+  static String messages({String? conversation, String? studentId, String? groupClassId}) =>
+      _withQuery('/messages', {'c': conversation, 'student': studentId, 'group': groupClassId});
+
+  /// [section]: profile | notifications | classwork | grading | region | security.
+  static String settings({String? section}) => _withQuery('/settings', {'section': section});
 
   static String section(NavSection s, {String? classId}) =>
       _withQuery(s.path, {'classId': classId});
